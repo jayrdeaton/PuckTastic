@@ -359,9 +359,9 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   // Anchored to the board's OWN rect (board.x/y/width/height, not the raw container) so placement
   // automatically respects both the rotated safe-area insets AND any desktop-web letterboxing.
   const scoreMargin = 20
-  // Desktop web keeps back/settings in the page's own top corners (see backSlot below), which a
-  // court that fills the window puts right on top of these labels, so there each label sits further
-  // in along the court's edge, beside its chip instead of under it.
+  // On desktop web each label sits further in along the court's edge, out of its paddle's lane. (It
+  // used to be what kept them out from under the back/settings chips in the page's top corners;
+  // the court itself keeps clear of those now, see computeBoardLayout.)
   const scoreMarginAlong = isDesktopWeb ? 96 : scoreMargin
   const p1ScorePos = localToScreen(board.x + scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
   const p2ScorePos = localToScreen(board.x + board.width - scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)

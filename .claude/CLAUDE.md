@@ -47,7 +47,7 @@ App Review flagged LightCycles, Snake and Solitaire as spam (too many similar ap
 ```bash
 npm run lint          # expo lint .
 npm run fix            # expo lint . --fix
-npm test               # Jest (49 suites, 715 tests)
+npm test               # Jest (50 suites, 723 tests)
 npm run test:watch     # Jest --watchAll
 npm run typecheck      # tsc
 npm run verify         # lint + test + typecheck
@@ -306,6 +306,7 @@ Every card on a game screen (this app's own result cards plus hud's `ConfirmDial
 On desktop web (web, window at least `DESKTOP_WEB_MIN_WIDTH` = 768 wide, the fleet's existing "desktop" cutoff) the game screen's back and settings chips sit in the page's own top-left/top-right corners (`8 + insets`, the same spot as hud's `CornerActionButtons`), upright, and stay up and pressable through every phase of a match, so a player can always back out or open Settings (Jay, 2026-10-15). Either one pauses play the way it already did between rounds. Narrower windows and native keep each game's own placement and hiding. Same rule in AirHockey, BoxHockey, LightCycles, Pong and Snake.
 
 - Here: `MatchOverlays` takes `desktopWeb`; `cornerButtonsVisible` is `desktopWeb || ...` (no fade mid-shot) and the chips leave the wall centerline for the page corners. Since a dialog can now open mid-way through a CPU windup or intercept, GameScreen's aim-cancel effect runs on any `paused`, not just `backgroundPaused` (a no-op outside 'aiming' and an intercept, see `AIM_CANCEL`); `backgroundPause.test.tsx` covers a dialog opened mid-windup. Checked live on web: the chips stay up through the face-off and a live puck, and a 700px window still puts them on the centerline.
+- **Paddles' and Breaker's court keeps clear of the chips (2026-10-24).** Their desktop court (16:9) filled the window's width, so the chips sat on its top corners and its walls, over the paddle riding up there. `shared/paddleGame/utils/board.ts`'s desktop branch now sizes the court with `src/shared/desktopChips.ts`'s `fitClearOfCornerChips`: the biggest 16:9 court whose walls stay `DESKTOP_CHIP_BAND` (56) clear of both sides or of the top and bottom, whichever leaves it bigger, so all four corners stay clear (a window taller than wide turns the court a quarter). A 16:10 window gives up height (1280x800: 1187x668), a 16:9 one width (1920x1080: 1808x1017), and a window wider than that loses nothing. Box Hockey's and Air Hockey's boards already left the corners empty at every window shape checked (Air Hockey's rink ends sit well in from its board's edge), so they're unchanged. Pinned by `src/__tests__/desktopChips.test.ts`. Checked on a local web export: Paddles at 1280x800, 1920x1080 and 800x1000, Breaker at 1280x720.
 
 ## Keep Awake (2026-10-15, on @rific/core since 2026-10-17)
 

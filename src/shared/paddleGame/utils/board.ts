@@ -1,13 +1,15 @@
 import { Platform } from 'react-native'
 import { EdgeInsets } from 'react-native-safe-area-context'
 
+import { fitClearOfCornerChips } from '@/shared/desktopChips'
 import { BALL_RADIUS_RATIO, BRICK_GAP_RATIO, DESKTOP_WEB_MIN_WIDTH, PADDLE_HEIGHT_RATIOS, PADDLE_INSET_RATIO, PADDLE_WIDTH_RATIO, SHARED_BRICK_COLS, SHARED_BRICK_FIELD_WIDTH_RATIO, SHARED_BRICK_FIELD_Y_MARGIN_RATIO, SHARED_BRICK_ROWS, SOLO_BRICK_COLS, SOLO_BRICK_FIELD_X_END_RATIO, SOLO_BRICK_FIELD_X_START_RATIO, SOLO_BRICK_FIELD_Y_MARGIN_RATIO, SOLO_BRICK_ROWS, TABLE_WIDTH_TO_HEIGHT_RATIO, WALL_THICKNESS } from '@/shared/paddleGame/constants/game'
 import { BoardLayout, Brick, PaddleSizeLevel, Player } from '@/shared/paddleGame/types'
 
 // Mirrors AirHockey's own isDesktopLayout - desktop web is the only context that fixes the board
 // to a fixed aspect ratio (TABLE_WIDTH_TO_HEIGHT_RATIO) rather than filling the viewport exactly.
 // Native and mobile web fill their container exactly, so the device's own physical edge already
-// reads as the boundary with zero gap.
+// reads as the boundary with zero gap. On desktop the court and its walls also keep clear of the back
+// and settings chips in the page's top corners (fitClearOfCornerChips).
 function isDesktopLayout(screenWidth: number): boolean {
   return Platform.OS === 'web' && screenWidth >= DESKTOP_WEB_MIN_WIDTH
 }
@@ -28,11 +30,9 @@ export function computeBoardLayout(screenWidth: number, screenHeight: number, in
   let width = availableWidth
   let height = availableHeight
   if (isDesktopLayout(screenWidth)) {
-    height = width / TABLE_WIDTH_TO_HEIGHT_RATIO
-    if (height > availableHeight) {
-      height = availableHeight
-      width = height * TABLE_WIDTH_TO_HEIGHT_RATIO
-    }
+    const fit = fitClearOfCornerChips(availableWidth, availableHeight, TABLE_WIDTH_TO_HEIGHT_RATIO, WALL_THICKNESS)
+    width = fit.width
+    height = fit.height
   }
 
   const x = insets.left + (availableWidth - width) / 2
