@@ -1,6 +1,7 @@
 import { ControlScheme, TipoffMode } from '@/games/boxhockey/types'
 import type { GameDefinition } from '@/shell/types'
 
+import { GameIcon } from './components/GameIcon'
 import { GUIDE_VERSION } from './constants/guide'
 import { getGuideSteps } from './constants/guideSteps'
 import { achievementsActions, achievementsReducer as achievements, GameStatsProvider } from './hooks/useGameStats'
@@ -26,8 +27,7 @@ export const boxHockey: GameDefinition = {
   id: 'boxhockey',
   title: 'Box Hockey',
   blurb: 'The classic wooden table game. Take turns shooting.',
-  // The pack's own app icon is Box Hockey's, so its tile uses the app icon files.
-  icon: { light: require('../../../assets/images/icon-light.png'), dark: require('../../../assets/images/icon-dark.png') },
+  icon: GameIcon,
   seatTwo: ['cpu', 'person'],
   // The board never turns a quarter turn, only flips upside down, on every platform.
   twoPlayerSeats: { faceToFaceOnWeb: true, followUpsideDown: true },

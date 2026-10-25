@@ -1,6 +1,7 @@
 import { ControlScheme } from '@/games/airhockey/types'
 import type { GameDefinition } from '@/shell/types'
 
+import { GameIcon } from './components/GameIcon'
 import { getGuideSteps } from './constants/guideSteps'
 import { achievementsActions, achievementsReducer, GameStatsProvider } from './hooks/useGameStats'
 import PlayScreen from './PlayScreen'
@@ -23,7 +24,7 @@ export const airHockey: GameDefinition = {
   id: 'airhockey',
   title: 'Air Hockey',
   blurb: 'The arcade table classic. Guard your goal and fire back.',
-  icon: { light: require('./art/icon-light.png'), dark: require('./art/icon-dark.png') },
+  icon: GameIcon,
   seatTwo: ['cpu', 'person'],
   // Face to face on a phone, never flipped for an upside-down hold; on the web a window seats the
   // two players by its own shape (see the play screen's fixedSeats).

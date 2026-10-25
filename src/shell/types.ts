@@ -1,7 +1,6 @@
 import type { MenuOption, PopoverHost } from '@tastic/hud'
 import type { GuideStep } from '@tastic/hud/guide'
 import type { ComponentType, ReactNode } from 'react'
-import type { ImageSourcePropType } from 'react-native'
 import type { Action, Reducer } from 'redux'
 
 import type { ShellState } from '@/shell/redux/shellState'
@@ -78,12 +77,22 @@ export interface GameGuide {
   getSteps: (input: object, context: { touch: boolean; mode: RoundMode }) => GuideStep[]
 }
 
+// A game's icon on Home, drawn in the seats' colors (seat 1's from Home's button, seat 2's from
+// whoever sits there), so it matches the players about to play, and in the theme where a part of it
+// follows the board's own colors.
+export interface GameIconProps {
+  size: number
+  p1Color: string
+  p2Color: string
+  dark: boolean
+}
+
 export interface GameDefinition {
   id: string
   title: string
   // One line under the tile's name on Home.
   blurb: string
-  icon: { light: ImageSourcePropType; dark: ImageSourcePropType }
+  icon: ComponentType<GameIconProps>
   // Seat 2's choices in this game, in menu order. 'nobody' only where the game has a solo mode.
   seatTwo: readonly SeatTwo[]
   // How the 2 Player loadout seats its players, to match where the game puts them: always face

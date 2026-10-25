@@ -5,7 +5,7 @@ import { PressAwayOverlay, usePopoverHost, useWellColors, WELL_SHADOW } from '@t
 import { type Profile, ProfilePicker } from '@tastic/profile'
 import { router } from 'expo-router'
 import { useCallback, useState } from 'react'
-import { Image, ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -58,7 +58,7 @@ export function HomeScreen() {
 
           <View style={styles.list}>
             {pack.games.map((game) => (
-              <GameRow key={game.id} game={game} dark={dark} onPress={() => openGame(game)} onRules={() => openFor(game.id)} />
+              <GameRow key={game.id} game={game} dark={dark} p1Color={p1Color} p2Color={p2Color} onPress={() => openGame(game)} onRules={() => openFor(game.id)} />
             ))}
           </View>
         </ScrollView>
@@ -75,6 +75,8 @@ export function HomeScreen() {
 interface GameRowProps {
   game: GameDefinition
   dark: boolean
+  p1Color: string
+  p2Color: string
   onPress: () => void
   onRules: () => void
 }
@@ -82,14 +84,17 @@ interface GameRowProps {
 // One game on its own well: its icon at app-icon size (the art was drawn as an app icon), its name
 // and one-line blurb, and a rules button at the end that shows its How to Play cards without
 // opening the game.
-function GameRow({ game, dark, onPress, onRules }: GameRowProps) {
+function GameRow({ game, dark, p1Color, p2Color, onPress, onRules }: GameRowProps) {
   const well = useWellColors()
+  const GameIcon = game.icon
   return (
     // The rules button sits beside the row's own button, laid over its end, not inside it: a button
     // inside a button is invalid on the web.
     <View>
       <Pressable onPress={onPress} style={[styles.row, { backgroundColor: well.bg }]} accessibilityRole='button' accessibilityLabel={game.title}>
-        <Image source={dark ? game.icon.dark : game.icon.light} style={styles.rowIcon} accessibilityIgnoresInvertColors />
+        <View style={[styles.rowIcon, { backgroundColor: dark ? ICON_DARK_BG : ICON_LIGHT_BG }]}>
+          <GameIcon size={ROW_ICON_SIZE} p1Color={p1Color} p2Color={p2Color} dark={dark} />
+        </View>
         <View style={styles.rowText}>
           <Text variant='titleLarge' style={[styles.rowTitle, { color: well.fg }]} numberOfLines={1}>
             {game.title}
@@ -108,6 +113,9 @@ function GameRow({ game, dark, onPress, onRules }: GameRowProps) {
 
 // The icon's size on a row: an app icon's, with its rounding.
 const ROW_ICON_SIZE = 56
+// The app icon's backgrounds (assets/images/icon-light.png and icon-dark.png), behind every game's art.
+const ICON_LIGHT_BG = '#FAFAFA'
+const ICON_DARK_BG = '#050505'
 // Room at a row's end for the rules button laid over it.
 const RULES_BUTTON_SPACE = 44
 
@@ -151,6 +159,7 @@ const styles = StyleSheet.create({
   rowIcon: {
     borderRadius: ROW_ICON_SIZE * 0.22,
     height: ROW_ICON_SIZE,
+    overflow: 'hidden',
     width: ROW_ICON_SIZE
   },
   rowText: {

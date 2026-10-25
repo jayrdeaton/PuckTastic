@@ -1,5 +1,6 @@
-import type { ImageSourcePropType } from 'react-native'
+import type { ComponentType } from 'react'
 
+import { PaddlesIcon } from '@/shared/paddleGame/components/PaddlesIcon'
 import { getGuideSteps } from '@/shared/paddleGame/constants/guideSteps'
 import { PaddlePlayScreen } from '@/shared/paddleGame/PlayScreen'
 import { createPaddleSettings, DEFAULT_SETTINGS } from '@/shared/paddleGame/settings'
@@ -7,13 +8,14 @@ import { createPaddleGameStats } from '@/shared/paddleGame/stats'
 import type { ControlScheme } from '@/shared/paddleGame/types'
 import { usePaddleLoadout } from '@/shared/paddleGame/usePaddleLoadout'
 import { createGameGuideSlice } from '@/shell/redux/gameGuideSlice'
-import type { GameDefinition, RoundMode } from '@/shell/types'
+import type { GameDefinition, GameIconProps, RoundMode } from '@/shell/types'
 
 interface PaddleGameOptions {
   id: string
   title: string
   blurb: string
-  icon: { light: ImageSourcePropType; dark: ImageSourcePropType }
+  // The game's icon on Home; Paddles' (Pong's art) when the game has none of its own.
+  icon?: ComponentType<GameIconProps>
   // A brick field every round, and a solo round with seat 2 set to Nobody (Breaker), or neither
   // (Paddles).
   hasBricks: boolean
@@ -34,7 +36,7 @@ interface GuideInput {
 // one stats shape, with the game's own store keys (`<id>Settings`, `<id>Controls`,
 // `<id>Achievements`, `<id>Guide`) so each keeps its own settings, stats, achievements and How to
 // Play.
-export function createPaddleGame({ id, title, blurb, icon, hasBricks, guideVersion }: PaddleGameOptions): GameDefinition {
+export function createPaddleGame({ id, title, blurb, icon = PaddlesIcon, hasBricks, guideVersion }: PaddleGameOptions): GameDefinition {
   const settings = createPaddleSettings(id)
   const stats = createPaddleGameStats({ key: `${id}Achievements`, hasBricks })
   const guide = createGameGuideSlice(`${id}Guide`)

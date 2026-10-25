@@ -6,7 +6,6 @@ export const paddles = createPaddleGame({
   id: 'paddles',
   title: 'Paddles',
   blurb: 'The arcade original. Get the puck past their paddle.',
-  icon: { light: require('./art/icon-light.png'), dark: require('./art/icon-dark.png') },
   hasBricks: false,
   guideVersion: 1
 })
