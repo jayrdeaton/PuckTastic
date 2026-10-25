@@ -30,3 +30,16 @@ To remove it:
 3. In `src/__tests__/store.test.ts`, delete the "a BoxHockey 1.0 save" tests.
 4. In CLAUDE.md's "Saved data", replace the import paragraph with a line saying 1.0 saves are no longer read (and when it was removed).
 5. Run `npm run verify`.
+
+## Game ideas (2026-10-24)
+
+Just ideas, nothing decided. Suggested order: Curling, Soccer, the Mölkky remake, with Foosball as its own bigger project.
+
+**First: puck-on-puck collisions.** Every game today has one puck (Breaker's only hits bricks), so nothing handles two moving pucks hitting each other. Curling, Soccer and the Mölkky remake all need it, so build it once, in shared code, with the first of them. Curling is the lightest case (a few stones, gentle bumps), Soccer the heaviest (7 bodies).
+
+- **Curling.** Already on ice, so a puck sliding to the house is curling with a different stone. Reuses Box Hockey's flick, turn-taking and "wait until everything stops". New: the house (closest to the button scores), the stones knocking each other, and a long, predictable glide (its own friction, not Box Hockey's). Sweeping could be a later variant, giving the waiting player something to do. Picked over Shuffleboard, which is the same game on a table.
+- **Soccer (button football).** A remake of a game Jay used to like: each side has 3 discs and there's one puck. Turn based but fast: flick one of your discs into the puck so it banks toward the goal. Needs choosing which disc to flick (tap one, or start the flick on it). The pack notes' "Soccer may come later" could be this.
+- **Mölkky remake.** Pucks as the numbered pins and the thrown piece. Hit exactly 50 to win, go over and drop back to 25. Pins stay where they slide, which is Mölkky's "stand them up where they fell" for free. Open question: from above, what counts as a pin knocked over (moved some distance, pushed off its spot)? Prototype that first. Up to 12 pucks colliding. Mölkky is likely a trademark of its Finnish maker, so give it a plain name (like "Pins") and a blurb like "the Finnish throwing game", as with Paddles and Breaker. There's already a standalone Molkky project to borrow from.
+- **Skittles.** A simple mode inside the Mölkky remake (knock down as many as you can, best of N), not its own game: two pin games would read as near-duplicates.
+- **Foosball.** Real time, like Air Hockey, not turn based. Great face to face across one device. New input: drag a rod to slide it, swipe to kick. Four rods a side crowds a phone, so 2 or 3 each. The biggest build here.
+- **Plinko (for little kids).** Mostly luck with one choice (where to drop), which is what makes it easy for little kids: anyone can play and win. Cheap to build: a puck bouncing off fixed pegs, no puck-on-puck collisions needed. Notes: the board is vertical, unlike the rest of the pack; take turns and compare scores for a head-to-head; Plinko is The Price Is Right's trademark, so give it a plain name and a blurb like "the classic peg drop game".
