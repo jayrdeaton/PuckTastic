@@ -114,7 +114,7 @@ export function LoadoutScreen({ game }: { game: GameDefinition }) {
   useEffect(() => {
     if (!humanSeats.every((s) => ready[s])) return
     dispatch(liveplayActions.setActiveRound({ game: game.id, mode, settings: roundSettingsRef.current }))
-    router.push({ pathname: '/[game]/play', params: { game: game.id } })
+    router.push({ pathname: '/play/[game]', params: { game: game.id } })
   }, [ready, humanSeats, game.id, mode, dispatch])
 
   const bg = dark ? '#000000' : '#FFFFFF'

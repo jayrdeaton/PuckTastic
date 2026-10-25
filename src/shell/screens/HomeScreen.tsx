@@ -39,7 +39,7 @@ export function HomeScreen() {
   const bg = dark ? '#000000' : '#FFFFFF'
   const fg = dark ? '#FFFFFF' : '#000000'
 
-  const openGame = useCallback((game: GameDefinition) => openFirstTime(game.id, () => router.push({ pathname: '/[game]/loadout', params: { game: game.id } })), [openFirstTime])
+  const openGame = useCallback((game: GameDefinition) => openFirstTime(game.id, () => router.push({ pathname: '/loadout/[game]', params: { game: game.id } })), [openFirstTime])
 
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>

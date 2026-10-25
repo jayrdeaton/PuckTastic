@@ -52,7 +52,7 @@ function AppStack() {
   return (
     <Stack screenOptions={{ ...rootBackground, ...statusBar }}>
       <Stack.Screen name='index' />
-      <Stack.Screen name='[game]/play' options={PLAY_OPTIONS} />
+      <Stack.Screen name='play/[game]' options={PLAY_OPTIONS} />
     </Stack>
   )
 }
