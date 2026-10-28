@@ -1,10 +1,9 @@
 import { Button } from '@rific/feedback-press'
-import { overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors } from '@tastic/hud'
+import { MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors } from '@tastic/hud'
 import { StyleSheet, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
 
 import type { SeatToastSpot } from '@/shared/SeatToasters'
-import { MONO_FONT } from '@/shell/fonts'
 import type { Seat as Player } from '@/shell/types'
 
 const SEATS: readonly Player[] = [1, 2]

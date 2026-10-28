@@ -2,10 +2,11 @@ import { useAutoPaperTheme } from '@rific/auto-paper'
 import { useHapticSettings } from '@rific/feedback-press'
 import { Toaster, ToastProvider } from '@rific/toaster'
 import { OrientationProvider, useRotationAwareStatusBar, useThemedRootBackground } from '@tastic/core'
+import { RotatedFrame } from '@tastic/hud'
 import * as Haptics from 'expo-haptics'
 import { Stack } from 'expo-router'
 import { DeviceMotion } from 'expo-sensors'
-import { ReactNode } from 'react'
+import { ReactNode, useCallback } from 'react'
 import { StyleSheet } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as RNPaper from 'react-native-paper'
@@ -52,7 +53,7 @@ function AppStack() {
   return (
     <Stack screenOptions={{ ...rootBackground, ...statusBar }}>
       <Stack.Screen name='index' />
-      <Stack.Screen name='[game]/play' options={PLAY_OPTIONS} />
+      <Stack.Screen name='play/[game]' options={PLAY_OPTIONS} />
     </Stack>
   )
 }
@@ -111,6 +112,18 @@ function HapticGatedToastProvider({ children }: { children: ReactNode }) {
   )
 }
 
+function RotatingToaster() {
+  const renderFrame = useCallback(
+    (toasts: ReactNode) => (
+      <RotatedFrame rotatedSafeArea passThrough>
+        {toasts}
+      </RotatedFrame>
+    ),
+    []
+  )
+  return <Toaster historyButton={null} clearButton={null} limit={3} renderFrame={renderFrame} />
+}
+
 // Every game's own root provider (its stats and achievements context), nested in pack order.
 function GameProviders({ games, children }: { games: readonly GameDefinition[]; children: ReactNode }) {
   return games.reduceRight<ReactNode>((inner, game) => <game.Provider key={game.id}>{inner}</game.Provider>, children)
@@ -126,8 +139,8 @@ export function RootLayout({ pack, store, persistor }: RootLayoutProps) {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <Fonts>
-          <PackProvider pack={pack}>
+        <PackProvider pack={pack}>
+          <Fonts>
             <Providers store={store} persistor={persistor}>
               <Theme>
                 <ProfilesProvider>
@@ -147,7 +160,7 @@ export function RootLayout({ pack, store, persistor }: RootLayoutProps) {
                           {/* historyButton/clearButton off: there's no toast history to open, and a
                           control row for it above the toast stack would go nowhere. limit pins the
                           package's current default (3) so a future toaster release can't change it. */}
-                          <Toaster historyButton={null} clearButton={null} limit={3} />
+                          <RotatingToaster />
                           <UpdateDialog />
                         </HapticGatedToastProvider>
                       </OrientationBridge>
@@ -156,8 +169,8 @@ export function RootLayout({ pack, store, persistor }: RootLayoutProps) {
                 </ProfilesProvider>
               </Theme>
             </Providers>
-          </PackProvider>
-        </Fonts>
+          </Fonts>
+        </PackProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )

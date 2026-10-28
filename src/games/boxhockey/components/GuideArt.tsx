@@ -1,11 +1,11 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
+import { MONO_FONT } from '@tastic/hud'
 import { SwipeHint } from '@tastic/hud/guide'
 import { StyleSheet, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
 
 import { CONTROL_SCHEME_SIGN } from '@/games/boxhockey/constants/game'
 import type { ControlScheme } from '@/games/boxhockey/types'
-import { MONO_FONT } from '@/shell/fonts'
 
 // BoxHockey-specific illustrations for the how-to-play cards (see constants/guideSteps.tsx). The
 // generic SwipeHint lives in @tastic/hud/guide; these only make sense for this game. Plain Views and

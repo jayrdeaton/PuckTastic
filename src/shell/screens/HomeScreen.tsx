@@ -3,14 +3,13 @@ import { IconButton, Pressable } from '@rific/feedback-press'
 import { FakeLandscapeView, rotateInsets, useRotation } from '@tastic/core'
 import { PressAwayOverlay, usePopoverHost, useWellColors, WELL_SHADOW } from '@tastic/hud'
 import { type Profile, ProfilePicker } from '@tastic/profile'
-import { router } from 'expo-router'
-import { useCallback, useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { router, useIsFocused } from 'expo-router'
+import { useCallback, useEffect, useState } from 'react'
+import { AppState, type AppStateStatus, ScrollView, StyleSheet, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useGameGuide } from '@/shell/components/GuideHost'
-import { HeroTitle } from '@/shell/components/HeroTitle'
 import { SettingsDialog } from '@/shell/components/SettingsDialog'
 import { useOpponent } from '@/shell/hooks/useOpponent'
 import { useProfiles } from '@/shell/hooks/useProfiles'
@@ -29,6 +28,15 @@ export function HomeScreen() {
   const { dark } = useAutoPaperTheme()
   const { openFirstTime, openFor } = useGameGuide()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const isFocused = useIsFocused()
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState)
+    return () => subscription.remove()
+  }, [])
+  // The hero pauses (HeroTitleProps.active) while a pushed screen covers Home or the app is in the
+  // background, so it never animates where nobody can see it.
+  const heroActive = isFocused && appState === 'active'
 
   const { profiles, lastSelected, selectProfile } = useProfiles()
   const { seatTwo } = useOpponent()
@@ -39,7 +47,7 @@ export function HomeScreen() {
   const bg = dark ? '#000000' : '#FFFFFF'
   const fg = dark ? '#FFFFFF' : '#000000'
 
-  const openGame = useCallback((game: GameDefinition) => openFirstTime(game.id, () => router.push({ pathname: '/[game]/loadout', params: { game: game.id } })), [openFirstTime])
+  const openGame = useCallback((game: GameDefinition) => openFirstTime(game.id, () => router.push({ pathname: '/loadout/[game]', params: { game: game.id } })), [openFirstTime])
 
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>
@@ -48,7 +56,7 @@ export function HomeScreen() {
       <FakeLandscapeView style={styles.rotatable}>
         <PressAwayOverlay active={pickerHost.openId !== null} onPress={pickerHost.close} />
         <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingTop: 56 + insets.top, paddingBottom: 24 + insets.bottom, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
-          <HeroTitle words={pack.wordmark} color={fg} p1Color={p1Color} p2Color={p2Color} />
+          <pack.HeroTitle words={pack.wordmark} color={fg} p1Color={p1Color} p2Color={p2Color} active={heroActive} />
 
           {/* Who's playing: seat 1's button, the same one each loadout starts with. Lifted above the
           tiles while its menu is open, so the menu paints over them. */}

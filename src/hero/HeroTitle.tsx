@@ -1,19 +1,9 @@
-import { getStaggeredWordDuration, StaggeredWord } from '@tastic/hud'
+import { getStaggeredWordDuration, MONO_FONT, StaggeredWord } from '@tastic/hud'
 import { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
 
-import { MONO_FONT } from '@/shell/fonts'
-
-export interface HeroTitleProps {
-  // The pack's wordmark, one word per line (see PackDefinition.wordmark).
-  words: readonly [string, string]
-  color: string
-  // The live theme's p1/p2 colors - whatever the players actually picked (see Theme.tsx), not a
-  // fixed pair - so the goal-line accent beneath the title always matches the real in-game colors.
-  p1Color: string
-  p2Color: string
-}
+import type { HeroTitleProps } from '@/shell/types'
 
 const LINE_DURATION_MS = 280
 // The puck's vertical position is one continuous chain, not a separate drop-in followed by a
@@ -26,12 +16,14 @@ const PUCK_DROP_OFFSET = -18
 const BOUNCE_DURATION_MS = 550
 const BOUNCE_HEIGHT = 8
 
-// The pack's hero (as opposed to LightCycles' light-trail wordmark): two staggered
-// lines of letters, then a goal-line accent - two colored bars sliding in from each side to meet
+// PuckTastic's hero (PackDefinition.HeroTitle, as opposed to DuelTastic's light-trail wordmark): the
+// wordmark's two words as two staggered lines of letters, then a goal-line accent - two colored bars sliding in from each side to meet
 // in the middle, echoing the two goals on the real board - with a small puck dropping onto the
 // seam between them once the bars land, then bouncing there for as long as the screen exists (see
 // puckY above) as one continuous motion rather than a drop-in that hands off to a separate idle
-// loop. The wordmark and bars themselves are a one-time entrance, not part of the loop.
+// loop. The wordmark and bars themselves are a one-time entrance, not part of the loop. The bars are
+// in the players' live colors (p1Color/p2Color), so they always match the real in-game colors. The
+// bounce keeps going while Home is covered (it ignores `active`).
 export function HeroTitle({ words, color, p1Color, p2Color }: HeroTitleProps) {
   const [wordTop, wordBottom] = words
   // The goal-line accent (and the puck that drops onto it) stay hidden until the wordmark has mostly

@@ -1,9 +1,7 @@
-import { StatSection, useWellColors } from '@tastic/hud'
+import { MONO_FONT, StatSection, useWellColors } from '@tastic/hud'
 import { type Profile, ProfileChip } from '@tastic/profile'
 import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
-
-import { MONO_FONT } from '@/shell/fonts'
 
 export interface ProfileRanking {
   profile: Profile
