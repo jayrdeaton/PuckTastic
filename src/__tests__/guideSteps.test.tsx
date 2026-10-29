@@ -15,7 +15,7 @@ const TIPOFFS: TipoffMode[] = ['faceoff', 'coinFlip', 'tripleTap']
 const MODES: GameMode[] = ['twoPlayer', 'vsCpu']
 
 // A fresh install's live settings: what the first-tap guide is actually built from. A fresh install
-// starts with the CPU in seat 2 (the shell's opponentSlice.ts).
+// starts with the CPU in seat 2 (@tastic/shell's opponentSlice).
 const DEFAULTS = { mode: 'vsCpu' as GameMode, controls: DEFAULT_SETTINGS.controlScheme, tipoff: DEFAULT_SETTINGS.tipoffMode, scoreToWin: DEFAULT_SETTINGS.scoreToWin }
 
 function stepsFor(touch: boolean, overrides: Partial<typeof DEFAULTS> = {}) {

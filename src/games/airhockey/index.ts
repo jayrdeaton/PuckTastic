@@ -1,5 +1,6 @@
+import type { GameDefinition } from '@tastic/shell'
+
 import { ControlScheme } from '@/games/airhockey/types'
-import type { GameDefinition } from '@/shell/types'
 
 import { GameIcon } from './components/GameIcon'
 import { getGuideSteps } from './constants/guideSteps'

@@ -1,6 +1,7 @@
+import { createPlayerSettings } from '@tastic/shell'
+
 import { SCORE_TO_WIN } from '@/games/boxhockey/constants/game'
 import type { ControlScheme, Settings } from '@/games/boxhockey/types'
-import { createPlayerSettings } from '@/shared/playerSettings'
 
 // What a player who hasn't changed a thing plays with. Each player's own changes are saved over it
 // (see below), so a field added later starts at its default for everyone.
@@ -32,8 +33,8 @@ export const DEFAULT_SETTINGS: Settings = {
   rink: false
 }
 
-// Box Hockey's loadout, per player (shared/playerSettings.ts): the match settings seat 1's player
-// last set up, under boxhockeySettings, and the shot style each player last picked, under
+// Box Hockey's loadout, per player (@tastic/shell's createPlayerSettings): the match settings seat
+// 1's player last set up, under boxhockeySettings, and the shot style each player last picked, under
 // boxhockeyControls. Shot styles aren't a shared resource the way a keyboard's key clusters are,
 // so both seats can play the same one.
 export const playerSettings = createPlayerSettings<Settings, ControlScheme>({ id: 'boxhockey', defaults: DEFAULT_SETTINGS })

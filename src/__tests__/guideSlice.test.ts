@@ -3,7 +3,8 @@ import reducer, { guideActions, selectGuideVersionSeen } from '@/games/boxhockey
 
 const REHYDRATE = 'persist/REHYDRATE'
 
-// Box Hockey's How to Play state, under its own key like every game's (shell/redux/gameGuideSlice.ts).
+// Box Hockey's How to Play state, under its own key like every game's (@tastic/shell's
+// createGameGuideSlice).
 describe("Box Hockey's guide slice", () => {
   it('starts a fresh install as never seen, so the cards show on the first tap of the game', () => {
     expect(reducer(undefined, { type: REHYDRATE, payload: undefined }).versionSeen).toBe(0)

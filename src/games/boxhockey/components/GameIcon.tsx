@@ -1,6 +1,5 @@
+import type { GameIconProps } from '@tastic/shell'
 import Svg, { Circle, G, Path } from 'react-native-svg'
-
-import type { GameIconProps } from '@/shell/types'
 
 // One stick: a rounded bar, laid at an angle by its group's transform.
 const STICK = 'M848.467,403.813C890.155,403.813 924,435.725 924,475.032C924,514.338 890.155,546.25 848.467,546.25L175.533,546.25C133.845,546.25 100,514.338 100,475.032C100,435.725 133.845,403.813 175.533,403.813L848.467,403.813Z'

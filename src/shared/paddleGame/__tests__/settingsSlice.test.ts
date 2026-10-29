@@ -1,8 +1,9 @@
+import type { ShellState } from '@tastic/shell'
+
 import { createPaddleSettings, DEFAULT_SETTINGS } from '@/shared/paddleGame/settings'
-import type { ShellState } from '@/shell/redux/shellState'
 
 // Each paddle game keeps its own players' settings under its own keys; Breaker's stands in for both.
-// The per-player behavior itself is shared/playerSettings.ts's, tested in playerSettings.test.tsx.
+// The per-player behavior itself is @tastic/shell's createPlayerSettings, tested in the package.
 const breaker = createPaddleSettings('breaker')
 
 const state = (extra: Record<string, unknown>) => ({ profileSelection: { 1: 'sam', 2: null }, opponent: { seatTwo: 'cpu' }, ...extra }) as unknown as ShellState

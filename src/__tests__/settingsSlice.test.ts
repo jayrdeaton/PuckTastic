@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS, playerSettings } from '@/games/boxhockey/redux/settingsSlice'
 
-// The per-player behavior itself is shared/playerSettings.ts's, tested in playerSettings.test.tsx.
-// The shell's own appSettingsSlice is tested beside it (shell/__tests__/appSettingsSlice.test.ts).
+// The per-player behavior itself is @tastic/shell's createPlayerSettings, tested in the package,
+// as is the shell's own appSettingsSlice.
 describe("Box Hockey's per-player settings", () => {
   it('are saved under boxhockeySettings and boxhockeyControls', () => {
     expect(Object.keys(playerSettings.reducers)).toEqual(['boxhockeySettings', 'boxhockeyControls'])

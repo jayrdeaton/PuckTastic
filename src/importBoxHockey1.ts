@@ -1,6 +1,5 @@
+import { seatPlayerKey } from '@tastic/shell'
 import type { PersistedState } from 'redux-persist'
-
-import { seatPlayerKey } from '@/shared/playerSettings'
 
 // The one-time import of a BoxHockey 1.0 save into PuckTastic's store (pack.ts's migrate). 1.0 saved
 // under 'boxhockey:root' with Box Hockey's keys unprefixed; the pack saves under 'pucktastic:root'

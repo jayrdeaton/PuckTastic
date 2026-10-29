@@ -1,12 +1,12 @@
 import { ControlSchemePicker, type MenuOption, type PopoverHost } from '@tastic/hud'
 import { assignSeatScheme } from '@tastic/input'
+import type { GameLoadout, LoadoutOptionsProps, RoundMode, Seat, SeatControlLook } from '@tastic/shell'
 import { useCallback, useMemo } from 'react'
 
 import { LOADOUT_SHARED_CONTROLS_IDS, LoadoutSharedControls } from '@/games/airhockey/components/LoadoutSharedControls'
 import { DEFAULT_SETTINGS, playerSettings } from '@/games/airhockey/redux/settingsSlice'
 import { ControlScheme, FrictionLevel, PaddleSizeLevel, PuckSizeLevel } from '@/games/airhockey/types'
 import { AIDifficulty } from '@/games/airhockey/utils/aiOpponent'
-import type { GameLoadout, LoadoutOptionsProps, RoundMode, Seat, SeatControlLook } from '@/shell/types'
 
 // The rink toggle's single option, same as BoxHockey's RINK_OPTION: presence in a one-item
 // multi-select's value array already means "on," so there's nothing an "off" row would add beyond
@@ -62,7 +62,7 @@ function pickRandom<T>(options: readonly { value: T }[]): T {
   return options[Math.floor(Math.random() * options.length)].value
 }
 
-// Air Hockey's part of the shared loadout (shell/screens/LoadoutScreen.tsx): its match options
+// Air Hockey's part of the shared loadout (@tastic/shell's LoadoutScreen): its match options
 // (rink, puck speed and size, paddle size, score to win), each seat's controls on desktop web, and
 // the CPU's difficulty.
 export function useLoadout(mode: RoundMode): GameLoadout {

@@ -1,9 +1,8 @@
 import { getStaggeredWordDuration, MONO_FONT, StaggeredWord } from '@tastic/hud'
+import type { HeroTitleProps } from '@tastic/shell'
 import { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
-
-import type { HeroTitleProps } from '@/shell/types'
 
 const LINE_DURATION_MS = 280
 // The puck's vertical position is one continuous chain, not a separate drop-in followed by a

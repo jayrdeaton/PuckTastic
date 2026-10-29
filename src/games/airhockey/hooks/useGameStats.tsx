@@ -1,10 +1,10 @@
+import { createGameStats } from '@tastic/shell'
 import { useCallback } from 'react'
 
 import { ACHIEVEMENT_CATALOG } from '@/games/airhockey/constants/achievements'
 import type { ProfileStats, StatsState } from '@/games/airhockey/types'
 import { applyMatchOutcome, getProfileStatsView, type MatchContext, type MatchOutcome } from '@/games/airhockey/utils/statsEngine'
 import { DEFAULT_STATS, isValidStats } from '@/games/airhockey/utils/statsValidation'
-import { createGameStats } from '@/shared/gameStats'
 
 // Air Hockey's stats and achievements, under its own store key (see the shared createGameStats).
 const gameStats = createGameStats<StatsState, ProfileStats>({ key: 'airhockeyAchievements', defaultStats: DEFAULT_STATS, isValidStats, catalog: ACHIEVEMENT_CATALOG, getProfileStatsView })

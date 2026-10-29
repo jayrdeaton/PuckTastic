@@ -1,6 +1,5 @@
+import type { GameIconProps } from '@tastic/shell'
 import Svg, { G, Path } from 'react-native-svg'
-
-import type { GameIconProps } from '@/shell/types'
 
 // A mallet's body, and the puck's black face.
 const DISC = 'M527.349,263.204C595.892,263.204 651.549,318.861 651.549,387.404C651.549,455.946 595.892,511.604 527.349,511.604C458.807,511.604 403.149,455.946 403.149,387.404C403.149,318.861 458.807,263.204 527.349,263.204Z'

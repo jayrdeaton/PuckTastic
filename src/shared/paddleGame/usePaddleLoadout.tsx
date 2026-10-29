@@ -1,5 +1,6 @@
 import { ControlSchemePicker, type MenuOption, type PopoverHost } from '@tastic/hud'
 import { assignSeatScheme } from '@tastic/input'
+import type { GameLoadout, LoadoutOptionsProps, RoundMode, Seat, SeatControlLook } from '@tastic/shell'
 import { useCallback, useMemo } from 'react'
 import { Platform } from 'react-native'
 
@@ -7,7 +8,6 @@ import { LOADOUT_SHARED_CONTROLS_IDS, LoadoutSharedControls } from '@/shared/pad
 import { DEFAULT_SETTINGS } from '@/shared/paddleGame/settings'
 import type { AiDifficulty, BallSpeedLevel, ControlScheme, PaddleSizeLevel, Settings } from '@/shared/paddleGame/types'
 import { tiltControlActiveFor } from '@/shared/paddleGame/utils/gameMode'
-import type { GameLoadout, LoadoutOptionsProps, RoundMode, Seat, SeatControlLook } from '@/shell/types'
 
 const PADDLE_SIZE_OPTIONS: MenuOption<PaddleSizeLevel>[] = [
   { value: 'small', label: 'Small', description: 'Shorter paddle, more precision', icon: 'circle-small' },
@@ -46,7 +46,7 @@ function pickRandom<T>(options: readonly { value: T }[]): T {
   return options[Math.floor(Math.random() * options.length)].value
 }
 
-// A paddle game's part of the shared loadout (shell/screens/LoadoutScreen.tsx), from the game's own
+// A paddle game's part of the shared loadout (@tastic/shell's LoadoutScreen), from the game's own
 // settings: its match options (paddle size, puck speed, score to win, and tilt steering while one
 // person plays on a phone), each seat's controls on desktop web, and the CPU's difficulty.
 export function usePaddleLoadout(mode: RoundMode, settings: Settings, setSettings: (patch: Partial<Settings>) => void): GameLoadout {

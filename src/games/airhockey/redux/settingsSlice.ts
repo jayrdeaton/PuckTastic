@@ -1,6 +1,7 @@
+import { createPlayerSettings } from '@tastic/shell'
+
 import { SCORE_TO_WIN } from '@/games/airhockey/constants/game'
 import type { ControlScheme, Settings } from '@/games/airhockey/types'
-import { createPlayerSettings } from '@/shared/playerSettings'
 
 // What a player who hasn't changed a thing plays with. Each player's own changes are saved over it
 // (see below), so a field added later starts at its default for everyone.
@@ -17,8 +18,8 @@ export const DEFAULT_SETTINGS: Settings = {
   controlScheme: { 1: 'mouse', 2: 'wasd' }
 }
 
-// Air Hockey's loadout, per player (shared/playerSettings.ts): the match settings seat 1's player
-// last set up, under airhockeySettings, and the controls each player last picked, under
+// Air Hockey's loadout, per player (@tastic/shell's createPlayerSettings): the match settings seat
+// 1's player last set up, under airhockeySettings, and the controls each player last picked, under
 // airhockeyControls. Two seats can't share the mouse or a key cluster, so when both players saved
 // the same one, seat 2 takes the next free one in the loadout's menu order for that match.
 export const playerSettings = createPlayerSettings<Settings, ControlScheme>({ id: 'airhockey', defaults: DEFAULT_SETTINGS, distinctControls: ['mouse', 'wasd', 'arrows', 'ijkl', 'numpad'] })

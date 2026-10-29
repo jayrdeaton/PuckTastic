@@ -1,5 +1,6 @@
+import type { GameDefinition } from '@tastic/shell'
+
 import { ControlScheme, TipoffMode } from '@/games/boxhockey/types'
-import type { GameDefinition } from '@/shell/types'
 
 import { GameIcon } from './components/GameIcon'
 import { GUIDE_VERSION } from './constants/guide'

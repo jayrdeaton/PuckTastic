@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { createPackStore, type GameDefinition, type PackDefinition } from '@tastic/shell'
 
 import { release } from '@/constants/release'
 import { airHockey } from '@/games/airhockey'
@@ -7,8 +8,6 @@ import { breaker } from '@/games/breaker'
 import { paddles } from '@/games/paddles'
 import { HeroTitle } from '@/hero/HeroTitle'
 import { createBoxHockey1Import } from '@/importBoxHockey1'
-import { createPackStore } from '@/shell/redux/createPackStore'
-import type { GameDefinition, PackDefinition } from '@/shell/types'
 
 // PuckTastic: the pack's identity and its games, in Home's order. Box Hockey first: it's the star,
 // and the game BoxHockey 1.0 shipped as. The App Store record, bundle id, EAS project and URL scheme

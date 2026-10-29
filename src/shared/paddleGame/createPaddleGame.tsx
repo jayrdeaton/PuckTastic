@@ -1,3 +1,4 @@
+import { createGameGuideSlice, type GameDefinition, type GameIconProps, type RoundMode } from '@tastic/shell'
 import type { ComponentType } from 'react'
 
 import { PaddlesIcon } from '@/shared/paddleGame/components/PaddlesIcon'
@@ -7,8 +8,6 @@ import { createPaddleSettings, DEFAULT_SETTINGS } from '@/shared/paddleGame/sett
 import { createPaddleGameStats } from '@/shared/paddleGame/stats'
 import type { ControlScheme } from '@/shared/paddleGame/types'
 import { usePaddleLoadout } from '@/shared/paddleGame/usePaddleLoadout'
-import { createGameGuideSlice } from '@/shell/redux/gameGuideSlice'
-import type { GameDefinition, GameIconProps, RoundMode } from '@/shell/types'
 
 interface PaddleGameOptions {
   id: string

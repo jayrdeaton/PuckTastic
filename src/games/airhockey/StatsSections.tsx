@@ -1,5 +1,6 @@
 import { getAchievementCatalogRows } from '@tastic/achievements'
 import { AchievementCatalogSection, ActivityStatSection, StatRow, StatSection } from '@tastic/hud'
+import { useProfiles } from '@tastic/shell'
 import { useMemo } from 'react'
 
 import { ACHIEVEMENT_CATALOG } from '@/games/airhockey/constants/achievements'
@@ -7,7 +8,6 @@ import { useGameStats } from '@/games/airhockey/hooks/useGameStats'
 import { getOverallTotals, getProfileRankings, getProfileStatsView } from '@/games/airhockey/utils/statsEngine'
 import { DEFAULT_PROFILE_STATS } from '@/games/airhockey/utils/statsValidation'
 import { PlayerRankingsSection } from '@/shared/PlayerRankings'
-import { useProfiles } from '@/shell/hooks/useProfiles'
 
 // The stats for one profile (a profile id) or every player (null): its own bucket viewed through the
 // same StatsState shape every predicate already reads, or the device-wide stats themselves.
@@ -17,7 +17,7 @@ function useStatsView(profileId: string | null) {
   return { stats, profileBucket, statsView: profileBucket ? getProfileStatsView(profileBucket) : stats }
 }
 
-// Air Hockey's sections on the shared stats screen (shell/screens/StatsScreen.tsx).
+// Air Hockey's sections on the shared stats screen (@tastic/shell's StatsScreen).
 export function StatsSections({ profileId }: { profileId: string | null }) {
   const { stats, profileBucket, statsView } = useStatsView(profileId)
   const { profiles } = useProfiles()

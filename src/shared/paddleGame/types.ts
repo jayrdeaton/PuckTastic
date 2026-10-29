@@ -1,7 +1,7 @@
 import { AchievementDefinition as BaseAchievementDefinition, DayStreakState, OutcomeRecord, RoundResult, WinStreakState } from '@tastic/achievements'
+import type { RoundMode } from '@tastic/shell'
 
 import type { ControlScheme } from '@/shared/controlScheme'
-import type { RoundMode } from '@/shell/types'
 
 export type Player = 1 | 2
 

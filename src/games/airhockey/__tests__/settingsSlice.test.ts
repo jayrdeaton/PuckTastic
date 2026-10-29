@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, playerSettings } from '@/games/airhockey/redux/settingsSlice'
 
-// The per-player behavior itself is shared/playerSettings.ts's, tested in playerSettings.test.tsx.
+// The per-player behavior itself is @tastic/shell's createPlayerSettings, tested in the package.
 describe("Air Hockey's per-player settings", () => {
   it('are saved under airhockeySettings and airhockeyControls', () => {
     expect(Object.keys(playerSettings.reducers)).toEqual(['airhockeySettings', 'airhockeyControls'])

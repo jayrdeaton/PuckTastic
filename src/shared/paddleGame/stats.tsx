@@ -1,14 +1,13 @@
 import { getAchievementCatalogRows } from '@tastic/achievements'
 import { AchievementCatalogSection, ActivityStatSection, StatRow, StatSection } from '@tastic/hud'
+import { createGameStats, type RecordResult, useProfiles } from '@tastic/shell'
 import { useCallback, useMemo } from 'react'
 
-import { createGameStats, type RecordResult } from '@/shared/gameStats'
 import { paddleGameCatalog } from '@/shared/paddleGame/constants/achievements'
 import type { ProfileStats, StatsState } from '@/shared/paddleGame/types'
 import { applyMatchOutcome, applySoloOutcome, getOverallTotals, getProfileRankings, getProfileStatsView, type MatchContext, type MatchOutcome } from '@/shared/paddleGame/utils/statsEngine'
 import { DEFAULT_PROFILE_STATS, DEFAULT_STATS, isValidStats } from '@/shared/paddleGame/utils/statsValidation'
 import { PlayerRankingsSection } from '@/shared/PlayerRankings'
-import { useProfiles } from '@/shell/hooks/useProfiles'
 
 const SPEEDS = ['slow', 'medium', 'fast'] as const
 

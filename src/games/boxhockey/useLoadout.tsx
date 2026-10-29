@@ -1,4 +1,5 @@
 import { type MenuOption, type PopoverHost, SectionedDropdown } from '@tastic/hud'
+import type { GameLoadout, LoadoutOptionsProps, RoundMode, Seat, SeatControlLook } from '@tastic/shell'
 import { useCallback, useMemo } from 'react'
 import { Platform } from 'react-native'
 
@@ -7,7 +8,6 @@ import { DEFAULT_SETTINGS, playerSettings } from '@/games/boxhockey/redux/settin
 import { BoardVariant, ControlScheme, FrictionLevel, InterceptSpeed, PuckSizeLevel, ShotPreviewLength, TipoffMode } from '@/games/boxhockey/types'
 import { AI_DIFFICULTY_LABELS, AIDifficulty } from '@/games/boxhockey/utils/aiOpponent'
 import { BOARD_VARIANT_LABELS } from '@/games/boxhockey/utils/board'
-import type { GameLoadout, LoadoutOptionsProps, RoundMode, Seat, SeatControlLook } from '@/shell/types'
 
 const BOARD_VARIANT_DESCRIPTIONS: Record<BoardVariant, string> = {
   classic: 'Off-center holes',
@@ -77,7 +77,7 @@ function pickRandom<T>(options: readonly { value: T }[]): T {
   return options[Math.floor(Math.random() * options.length)].value
 }
 
-// Box Hockey's part of the shared loadout (shell/screens/LoadoutScreen.tsx): its match options
+// Box Hockey's part of the shared loadout (@tastic/shell's LoadoutScreen): its match options
 // (board, rink, puck physics, intercepts, score to win, shot preview, tip-off), each seat's shot
 // style, and the CPU's difficulty.
 export function useLoadout(mode: RoundMode): GameLoadout {
