@@ -10,9 +10,11 @@ describe('seatToastSpots', () => {
     expect(seatToastSpots({ orientationMode: 'faceToFace', p1OnRight: true, upsideDown: true }, false)).toEqual({ 1: { rotation: 180, zone: 'top' }, 2: { rotation: 0, zone: 'bottom' } })
   })
 
-  it("keeps players side by side in a landscape hold on their own half of the board, both reading it the card's way", () => {
-    expect(seatToastSpots({ orientationMode: 'sideBySide', p1OnRight: true, upsideDown: false }, false)).toEqual({ 1: { rotation: -90, zone: 'bottom' }, 2: { rotation: -90, zone: 'top' } })
-    expect(seatToastSpots({ orientationMode: 'sideBySide', p1OnRight: false, upsideDown: false }, false)).toEqual({ 1: { rotation: 90, zone: 'bottom' }, 2: { rotation: 90, zone: 'top' } })
+  it('keeps the face-to-face halves for a wide window on native, player 2 turned across the table', () => {
+    // Since @tastic/core 0.15 the reading is the window's shape, never a sideways hold.
+    const faceToFace = { 1: { rotation: 0, zone: 'bottom' }, 2: { rotation: 180, zone: 'top' } }
+    expect(seatToastSpots({ orientationMode: 'sideBySide', p1OnRight: true, upsideDown: false }, false, false)).toEqual(faceToFace)
+    expect(seatToastSpots({ orientationMode: 'sideBySide', p1OnRight: false, upsideDown: false }, false, false)).toEqual(faceToFace)
   })
 
   it('splits a computer screen left and right, both upright', () => {
