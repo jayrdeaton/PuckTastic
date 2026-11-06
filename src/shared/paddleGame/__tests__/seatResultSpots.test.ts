@@ -6,10 +6,6 @@ describe('seatResultSpots', () => {
     expect(seatResultSpots(-90, false)).toEqual({ 1: { rotation: 0, zone: 'bottom' }, 2: { rotation: 180, zone: 'top' } })
   })
 
-  it('follows the court over when the phone is held upside down', () => {
-    expect(seatResultSpots(90, false)).toEqual({ 1: { rotation: 180, zone: 'top' }, 2: { rotation: 0, zone: 'bottom' } })
-  })
-
   it('splits an unturned court left and right, both upright', () => {
     expect(seatResultSpots(0, false)).toEqual({ 1: { rotation: 0, zone: 'left' }, 2: { rotation: 0, zone: 'right' } })
     expect(seatResultSpots(0, true)).toEqual({ 1: { rotation: 0, zone: 'left' }, 2: { rotation: 0, zone: 'right' } })

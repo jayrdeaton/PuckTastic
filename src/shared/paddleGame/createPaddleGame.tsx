@@ -56,9 +56,10 @@ export function createPaddleGame({ id, title, blurb, icon = PaddlesIcon, hasBric
     blurb,
     icon,
     seatTwo: hasBricks ? ['cpu', 'person', 'nobody'] : ['cpu', 'person'],
-    // Face to face on a phone, P1 at the bottom unless the phone is held upside down; on the web a
-    // window seats the two players by its own shape (see the play screen's fixedSeats).
-    twoPlayerSeats: { faceToFaceOnWeb: false, followUpsideDown: true },
+    // 2 Player seats by the window's shape, as the court does (see the play screen's rotation): face
+    // to face in a tall window, P1 at the bottom (a phone, always portrait), side by side in a wide
+    // one, P1 on the left (a landscape iPad, a browser window).
+    sideBySideWhenWide: true,
     reducers: { ...settings.reducers, [`${id}Achievements`]: stats.reducer, [`${id}Guide`]: guide.reducer },
     Provider: stats.Provider,
     useLoadout,

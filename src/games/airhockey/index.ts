@@ -27,9 +27,10 @@ export const airHockey: GameDefinition = {
   blurb: 'The arcade table classic. Guard your goal and fire back.',
   icon: GameIcon,
   seatTwo: ['cpu', 'person'],
-  // Face to face on a phone, never flipped for an upside-down hold; on the web a window seats the
-  // two players by its own shape (see the play screen's fixedSeats).
-  twoPlayerSeats: { faceToFaceOnWeb: false, followUpsideDown: false },
+  // 2 Player seats by the window's shape, as the rink does (see the play screen's goalAxis): face to
+  // face in a tall window (a phone, always portrait), side by side in a wide one (a landscape iPad, a
+  // browser window), player 1 on the left.
+  sideBySideWhenWide: true,
   reducers: { ...playerSettings.reducers, airhockeyAchievements: achievementsReducer, airhockeyGuide: guide },
   Provider: GameStatsProvider,
   useLoadout,

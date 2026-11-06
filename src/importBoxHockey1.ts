@@ -14,9 +14,10 @@ import type { PersistedState } from 'redux-persist'
 
 const OLD_KEY = 'boxhockey:root'
 
-// What 1.0's Box Hockey settings held that is the pack's now: Lock Orientation and its angle, and
-// Edge Guard (appSettings), and the last mode picked on 1.0's Home (seat 2, opponent). Each seat's
-// shot style is per player now (boxhockeyControls).
+// What 1.0's Box Hockey settings held that is the pack's now: Edge Guard (appSettings) and the last
+// mode picked on 1.0's Home (seat 2, opponent). Each seat's shot style is per player now
+// (boxhockeyControls). Lock Orientation and its angle are dropped: the pack has no such setting since
+// @tastic/shell 0.5.
 interface OneZeroSettings {
   gameMode?: 'twoPlayer' | 'vsCpu'
   lockOrientation?: boolean
@@ -55,11 +56,11 @@ export function importBoxHockey1(saved: Record<string, unknown>): Record<string,
   const selection = { 1: null, 2: null, ...(saved.profileSelection as Partial<Record<Seat, string | null>> | undefined) }
   const player = (seat: Seat) => seatPlayerKey(selection, seat)
   if (settings) {
-    const { gameMode, lockOrientation, lockedRotation, deferBottomEdgeGestures, controlScheme: _controlScheme, ...match } = settings
+    const { gameMode, lockOrientation: _lockOrientation, lockedRotation: _lockedRotation, deferBottomEdgeGestures, controlScheme: _controlScheme, ...match } = settings
     // 1.0 had one setup for everyone, last set up from seat 1, so it's seat 1's player's own now
     // (the guest, or the profile 1.0 had in seat 1, who loads it). Anyone else starts on the defaults.
     imported.boxhockeySettings = { [player(1)]: match }
-    imported.appSettings = { lockOrientation: lockOrientation ?? false, deferBottomEdgeGestures: deferBottomEdgeGestures ?? false, ...(lockedRotation !== undefined ? { lockedRotation } : {}) }
+    imported.appSettings = { deferBottomEdgeGestures: deferBottomEdgeGestures ?? false }
     imported.opponent = { seatTwo: gameMode === 'twoPlayer' ? 'person' : 'cpu' }
   }
 

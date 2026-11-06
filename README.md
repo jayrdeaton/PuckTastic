@@ -24,7 +24,7 @@ PuckTastic is a pack of physics-driven puck games for iOS, Android, and web, and
 - **Player profiles:** saved names, colors, and tags. On iOS the roster is shared with my other games through an App Group. A profile's color pick for a seat is kept for this pack only.
 - **Stats and achievements:** each game keeps its own stats and its own achievements (138 in all: Box Hockey 33, Air Hockey 33, Paddles 33, Breaker 39). One stats screen filters by player and by game, with per-profile and device-wide records, player rankings, and day streaks. Unlocks show as toasts; in 2 Player each player's toasts and Game Over card face them in their own half.
 - **Desktop web:** in Air Hockey, Paddles and Breaker each seat plays with the mouse or a key cluster (WASD, the arrow keys, IJKL, or the numpad), picked in the loadout. Box Hockey shoots with the mouse and takes face-offs on the keys.
-- **Settings:** sound, haptics, appearance, blur, Lock Orientation, Keep Awake, Edge Guard (an iOS option that makes system edge gestures need a second swipe during play), and Check for Updates. A match pauses when the app goes to the background and stays Paused until a player taps Resume.
+- **Settings:** sound, haptics, appearance, blur, Keep Awake, Edge Guard (an iOS option that makes system edge gestures need a second swipe during play), and Check for Updates. A match pauses when the app goes to the background and stays Paused until a player taps Resume.
 
 ## Under the hood
 
@@ -44,7 +44,7 @@ PuckTastic is a pack of physics-driven puck games for iOS, Android, and web, and
 
 | Package | Used for |
 | --- | --- |
-| [`@tastic/core`](https://github.com/jayrdeaton/React-Native-Game-Core) | Game loop, orientation and rotation handling, settled window sizing for the web canvas, background pause, config plugin for the native portrait lock |
+| [`@tastic/core`](https://github.com/jayrdeaton/React-Native-Game-Core) | Game loop, seat mode from the window's shape, tilt in the screen's axes, settled window sizing for the web canvas, background pause |
 | [`@tastic/physics`](https://www.npmjs.com/package/@tastic/physics) | Circle/rect/rounded-corner collision, reflection, friction, gravity wells, goal-wedge geometry |
 | [`@tastic/input`](https://www.npmjs.com/package/@tastic/input) | Drag-to-aim vector math, desktop key schemes |
 | [`@tastic/split-screen`](https://www.npmjs.com/package/@tastic/split-screen) | Two-player loadout zone layout (face-to-face vs side-by-side) |

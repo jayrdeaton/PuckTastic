@@ -121,10 +121,9 @@ export function useLoadout(mode: RoundMode): GameLoadout {
   }, [setSettings, mode])
 
   const options = useCallback(
-    ({ host, rotation, accentColor, mutedColor, onAccentColor, dark, onRandomize, onReset }: LoadoutOptionsProps) => (
+    ({ host, accentColor, mutedColor, onAccentColor, dark, onRandomize, onReset }: LoadoutOptionsProps) => (
       <LoadoutSharedControls
         host={host}
-        rotation={rotation as 0 | 90 | 180 | -90}
         boardVariant={settings.boardVariant}
         boardVariantOptions={BOARD_VARIANT_OPTIONS}
         onBoardVariantChange={(value) => setSettings({ boardVariant: value })}

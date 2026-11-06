@@ -94,61 +94,16 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   const tiltControlActive = tiltControlActiveFor(gameMode, roundSettings.tiltControlEnabled)
 
   // ─── Orientation / rotation ────────────────────────────────────────────────
-  // orientationMode/upsideDown are live accelerometer tilt readings, frozen at their last value while
-  // the Lock Orientation setting is on. That lock is app-wide (_layout.tsx's OrientationProvider
-  // freezes the shared reading under `freezeWhileLocked`), so it's live settings, not roundSettings,
-  // and toggling it from this screen's own Settings dialog applies mid-round. The only per-screen
-  // lock left here is tilt control's, below.
-  //
-  // DELIBERATE DEVIATION from calling @tastic/core's getFixedZoneRotation directly: that
-  // function (verified against the installed package's actual source, src/rotation.ts) returns 0 for
-  // 'faceToFace' and ±90 for 'sideBySide' - the correct polarity for BoxHockey/AirHockey's own board,
-  // which is PORTRAIT-native in local space (goals/paddle-separation along local Y) and so needs zero
-  // rotation exactly when the device is held upright/portrait (faceToFace) and a compensating ±90
-  // only when physically turned sideways (sideBySide) to still read correctly. Pong's board is the
-  // mirror image - LANDSCAPE-native in local space (paddle separation along local X, the long axis -
-  // see BoardLayout's own doc comment in types/index.ts) - so it needs the OPPOSITE polarity: zero
-  // rotation for sideBySide (the device is already physically turned so its long edge runs left-
-  // right, matching Pong's native wide shape with no correction needed) and ±90 for faceToFace (the
-  // device stays portrait/unrotated under app.json's OS-level portrait lock, so the wide board must
-  // still be rotated to present correctly to two players seated at its near/far ends - the same
-  // swap-and-rotate escape hatch FakeLandscapeView itself uses for wide content, just triggered by
-  // the opposite orientationMode, since FakeLandscapeView's own content - the home/loadout screens -
-  // is authored tall/stacked-native instead). A literal `getFixedZoneRotation(orientationMode, ...)`
-  // call here would rotate the board exactly backwards (rotating the one mode that's already correct,
-  // and leaving unrotated the one mode that genuinely needs it) - confirmed by cross-checking against
-  // AirHockey's own OLD (portrait-native) rotation wrapper, whose goalAxis === 'horizontal' branch
-  // (its own sideBySide-equivalent) is the one that rotates, mirroring getFixedZoneRotation's real
-  // convention for tall-native content exactly, which is the mirror image of what a wide-native board
-  // needs.
-  //
-  // The sign for faceToFace is keyed off `upsideDown` (the only live-varying signal in that mode -
-  // useOrientationState's own faceToFace reading hardcodes p1OnRight: true, so it can never
-  // actually distinguish anything) rather than derived from theory - like AirHockey's original
-  // rotation wrapper, whose own rotation SIGN was "confirmed empirically" against the real render
-  // rather than reasoned out in the abstract, this polarity should be spot-checked in a simulator by
-  // rotating through both faceToFace placements and flipped if player 1's paddle doesn't end up
-  // nearest whichever seat is holding the device's own "right-side-up" reading direction.
-  // `locked` = tiltControlActive: a per-screen lock on top of the app-wide Lock Orientation setting,
-  // forced whenever tilt steering is active even with that setting off. This same reading drives the
-  // board's own `rotation` below, and a sustained extreme steering tilt held past this hook's own
-  // ~275ms commit window could otherwise cross its dominance-ratio threshold and flip
-  // orientationMode/upsideDown, visually rotating the whole board mid-rally. roundSettings is frozen
-  // for the entire round (see useActiveRound), so this engages the
-  // instant this screen mounts (well before any actual tilt-steering begins) and never toggles again
-  // mid-round.
-  const { orientationMode, upsideDown } = useOrientationState(tiltControlActive)
-  // Player 1 sits at the visual bottom of a portrait/faceToFace hold (-90; the top when held upside
-  // down, 90): the natural single-hand grip for vsCpu's lone human, and, in 2 Player, the same half
-  // the loadout gives P1 (its panels flip with an upside-down hold too). 2 Player used to take the
-  // opposite sign, which put P1 at the top of the court after picking the bottom panel.
-  //
-  // 2 Player on a phone also plays face-to-face in a landscape hold (fixedSeats): the loadout pins
-  // 2 Player's panels top/bottom there, so each player keeps the same half of the phone from the
-  // loadout into the match. The unrotated side-by-side court split the phone lengthwise instead,
-  // which the loadout can't show.
-  const fixedSeats = Platform.OS !== 'web' && humanPlayers.length === 2
-  const rotation: 0 | 90 | -90 = orientationMode !== 'faceToFace' && !fixedSeats ? 0 : upsideDown ? 90 : -90
+  // The court is LANDSCAPE-native in local space (paddle separation along local X, the long axis -
+  // see BoardLayout's own doc comment in types/index.ts), so it follows the window's shape: unturned
+  // in a wide window (a landscape iPad, a browser window), where 2 Player sits side by side, P1 on
+  // the left (Paddles and Breaker set the shell's sideBySideWhenWide, so the loadout splits the same
+  // way); turned -90 in a tall one (a phone, always portrait), which puts P1 at the bottom, face to
+  // face with P2 at the top in 2 Player. That's the opposite polarity from AirHockey's portrait-native
+  // rink, which turns in the wide window instead. Nothing reads the device's hold, so tilt steering
+  // can't turn the court either (see TiltInputLayer for how steering follows the interface).
+  const { orientationMode } = useOrientationState()
+  const rotation: 0 | -90 = orientationMode === 'sideBySide' ? 0 : -90
 
   const { width, height } = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -359,11 +314,11 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   const scoreMarginAlong = isDesktopWeb ? 96 : scoreMargin
   const p1ScorePos = localToScreen(board.x + scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
   const p2ScorePos = localToScreen(board.x + board.width - scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
-  // Player 2 sits at the OPPOSITE end of a face-to-face hold (see the rotation comment above) - its
+  // Player 2 sits at the OPPOSITE end of a face-to-face court (see the rotation comment above) - its
   // own label needs the opposing 180° reading direction to stay upright from player 2's own seat.
   // For sideBySide (rotation 0) this is trivially still 0 - both players share the same viewing
   // angle there, so no relative flip is needed.
-  const p2Rotation: 0 | 90 | -90 = rotation === 90 ? -90 : rotation === -90 ? 90 : 0
+  const p2Rotation: 0 | 90 = rotation === -90 ? 90 : 0
 
   const buttonMargin = 16
   const backPos = localToScreen(board.x + buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
@@ -383,7 +338,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   // carrying rotationStyle (not p2RotationStyle) since that ±90° reflects the whole board's own
   // landscape-native-vs-portrait-hold orientation, not a P1-vs-P2 opposing flip, and stays needed
   // even here for the icon to read upright at all.
-  const neutralZone = needsSharedNeutralZone(fixedSeats ? 'faceToFace' : orientationMode, humanPlayers.length)
+  const neutralZone = needsSharedNeutralZone(orientationMode, humanPlayers.length)
   // Desktop web: the page's own top corners, upright, the same spot as hud's CornerActionButtons on
   // every other screen. Both players share one screen, keyboard and mouse there, so there's no far
   // seat for the neutral edge to serve, and the page is always read upright.
@@ -575,11 +530,8 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
       <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} rotation={rotation} />
 
-      {/* rotation={rotation} - same physical-hold-compensating rotation the board itself uses (see
-          the rotation comment above), not a separate reading; previously omitted, leaving this
-          dialog's content stuck unrotated for a faceToFace hold while every other floating card on
-          this screen correctly rotated. */}
-      <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} rotation={rotation} />
+      {/* Upright: since @tastic/shell 0.5 the Settings dialog takes no turn of its own. */}
+      <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />
     </View>
   )
 }

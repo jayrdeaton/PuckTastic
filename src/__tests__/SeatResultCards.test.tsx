@@ -47,10 +47,10 @@ describe('SeatResultCards', () => {
     expect(cardRotation(2)).toBe('180deg')
   })
 
-  it('follows the spots it is given (a sideways hold, both reading the same way)', async () => {
-    await renderCards({ spots: { 1: { rotation: -90, zone: 'bottom' }, 2: { rotation: -90, zone: 'top' } } })
-    expect(cardRotation(1)).toBe('-90deg')
-    expect(cardRotation(2)).toBe('-90deg')
+  it('follows the spots it is given (side by side, both upright)', async () => {
+    await renderCards({ spots: { 1: { rotation: 0, zone: 'left' }, 2: { rotation: 0, zone: 'right' } } })
+    expect(cardRotation(1)).toBe('0deg')
+    expect(cardRotation(2)).toBe('0deg')
   })
 
   it("puts each card's Quit and Play Again side by side on hud's action row, Quit first", async () => {

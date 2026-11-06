@@ -30,8 +30,7 @@ export const boxHockey: GameDefinition = {
   blurb: 'The classic wooden table game. Take turns shooting.',
   icon: GameIcon,
   seatTwo: ['cpu', 'person'],
-  // The board never turns a quarter turn, only flips upside down, on every platform.
-  twoPlayerSeats: { faceToFaceOnWeb: true, followUpsideDown: true },
+  // No sideBySideWhenWide: the board never turns, so 2 Player is face to face in any window.
   reducers: { ...playerSettings.reducers, boxhockeyAchievements: achievements, boxhockeyGuide: guide },
   Provider: GameStatsProvider,
   useLoadout,

@@ -29,12 +29,11 @@
       "bundleIdentifier": "com.infinitetoken.BoxHockey",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UISupportedInterfaceOrientations~ipad": [
+        "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait"
         ],
         "UIViewControllerBasedStatusBarAppearance": true
       },
-      "requireFullScreen": true,
       "icon": {
         "dark": "./assets/images/icon-dark.png",
         "light": "./assets/images/icon-light.png"

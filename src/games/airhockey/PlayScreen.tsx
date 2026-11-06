@@ -83,20 +83,13 @@ export default function GameScreen() {
   const aiDifficulty = roundSettings.aiDifficulty
   const humanPlayers = humanSeatsFor(mode)
 
-  // Unlike BoxHockey (always pinned portrait, since its board is always vertical), AirHockey's
-  // board adapts to either orientation (see GoalAxis's own doc comment in types/index.ts), so the
-  // goal axis and touch mapping follow the shared reading. Lock Orientation freezes that reading
-  // app-wide (see OrientationBridge in _layout.tsx), the board included: while it's on, tilting the
-  // phone never flips the goal axis, and toggling it from this screen's own Settings dialog takes
-  // effect immediately rather than waiting for the next round.
-  //
-  // Except 2 Player on a phone, which always plays face-to-face (P1 at the bottom, P2 at the top)
-  // however the phone is held: the loadout's 2 Player panels are pinned to that same split, so each
-  // player keeps the same half of the phone from the loadout into the match. Turning the rink a
-  // quarter turn for a landscape hold used to give P1 a lengthwise half the loadout can't show.
-  const { orientationMode, p1OnRight } = useOrientationState()
-  const fixedSeats = Platform.OS !== 'web' && humanPlayers.length === 2
-  const goalAxis: GoalAxis = orientationMode === 'sideBySide' && !fixedSeats ? 'horizontal' : 'vertical'
+  // Unlike BoxHockey (always vertical), AirHockey's board adapts to the window's shape (see
+  // GoalAxis's own doc comment in types/index.ts): vertical goals in a tall window (a phone, always
+  // portrait, so 2 Player is face to face there, P1 at the bottom), horizontal ones in a wide window
+  // (a landscape iPad, a browser window). Air Hockey sets the shell's sideBySideWhenWide, so the
+  // loadout's 2 Player panels split the same way and each player keeps their half into the match.
+  const { orientationMode } = useOrientationState()
+  const goalAxis: GoalAxis = orientationMode === 'sideBySide' ? 'horizontal' : 'vertical'
 
   const { width, height } = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -104,22 +97,15 @@ export default function GameScreen() {
   // comment in types/index.ts) regardless of goalAxis - goalAxis only decides which real screen
   // dimension feeds its short-vs-long split, not the shape of what it hands back. So this ±90°
   // exists to visually turn that always-tall container into a landscape-looking one whenever
-  // goalAxis is 'horizontal' - unlike @tastic/core's own getViewRotation (which compensates
-  // specifically for a portrait-locked OS refusing to rotate its render surface), this need is
-  // unrelated to OS lock state and applies on every platform, web included.
-  const rotationDeg: 0 | 90 | -90 = goalAxis === 'horizontal' ? (p1OnRight ? 90 : -90) : 0
+  // goalAxis is 'horizontal'. The turn is +90, which carries the rink's bottom (player 1's end) to
+  // the left, where the loadout's side-by-side panels put player 1. It's purely the rink's own
+  // layout: the window is already the right shape (the OS turns the interface), so everything
+  // floating over the rink stays upright (see overlays below).
+  const rotationDeg: 0 | 90 = goalAxis === 'horizontal' ? 90 : 0
 
-  // Unlike the rotation above, THIS swap is genuinely native-only: computeBoardLayout expects
-  // screenWidth/screenHeight to reflect the VISUAL orientation directly (width > height once truly
-  // in landscape) - true on web, where the browser window itself is already the correct shape once
-  // wide (useOrientationState's own web fallback derives 'horizontal' from exactly that), so
-  // useWindowDimensions() there is used as-is. Native is portrait-locked at the OS level, so
-  // useWindowDimensions() always reports portrait W×H no matter how the phone is actually held -
-  // swapped here, at this one call site, to re-derive what genuine landscape dimensions would have
-  // been, rather than touching computeBoardLayout's own long-established S/L-split math.
-  const swapForOsPortraitLock = Platform.OS !== 'web' && goalAxis === 'horizontal'
-  const logicalWidth = swapForOsPortraitLock ? height : width
-  const logicalHeight = swapForOsPortraitLock ? width : height
+  // computeBoardLayout reads the window's own visual shape (width > height in landscape).
+  const logicalWidth = width
+  const logicalHeight = height
   // rotateInsets always returns a fresh object, so this has to be memoized on insets/rotationDeg
   // itself - otherwise logicalInsets is a new reference every render, which busts the board
   // useMemo below on every render regardless of whether anything actually changed, which in turn
@@ -294,16 +280,13 @@ export default function GameScreen() {
   const buttonY = Math.max(board.y, 12) + buttonMargin
   const backPos = localToScreen(board.x + buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
   const settingsPos = localToScreen(board.x + board.width - buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
-  const rotationStyle = rotationDeg !== 0 ? { transform: [{ rotate: `${rotationDeg}deg` }] } : undefined
-  // Desktop web turns the rink a quarter turn to fit a wide window, but the page itself is always
-  // read upright there, so the back/settings chips, the Game Over card and the dialogs stay upright
-  // too rather than turning with it. The chips also leave the rink for the page's own top corners,
-  // the same spot as hud's CornerActionButtons on every other screen; following the rink would carry
-  // them down the page's left edge.
-  const overlayRotationDeg = isDesktopWeb ? 0 : rotationDeg
-  const overlayRotationStyle = isDesktopWeb ? undefined : rotationStyle
-  const backSlot = isDesktopWeb ? { top: 8 + insets.top, left: 8 + insets.left } : { left: backPos.x - 24, top: backPos.y - 24 }
-  const settingsSlot = isDesktopWeb ? { top: 8 + insets.top, right: 8 + insets.right } : { left: settingsPos.x - 24, top: settingsPos.y - 24 }
+  // A wide window turns the rink a quarter turn to fit, but the window itself is read upright, so the
+  // back/settings chips, the Game Over card and the dialogs never turn with it. The chips leave the
+  // rink for the window's own top corners then (and always on desktop web), the same spot as hud's
+  // CornerActionButtons on every other screen; following the rink would carry them down its left edge.
+  const cornerChips = isDesktopWeb || rotationDeg !== 0
+  const backSlot = cornerChips ? { top: 8 + insets.top, left: 8 + insets.left } : { left: backPos.x - 24, top: backPos.y - 24 }
+  const settingsSlot = cornerChips ? { top: 8 + insets.top, right: 8 + insets.right } : { left: settingsPos.x - 24, top: settingsPos.y - 24 }
 
   const progressMessage = (
     <>
@@ -349,9 +332,7 @@ export default function GameScreen() {
       render is exactly right, not stale. */}
       <KeyboardInputLayer enabled={!paused} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddlePos={{ 1: paddles[1], 2: paddles[2] }} onPaddleTarget={setPaddleTarget} />
 
-      {/* Game Over overlay - card rotates as a unit via rotationDeg so it reads upright whichever
-          way the board itself is currently rotated (see rotationStyle above), matching Pong's own
-          Game Over card; previously left unrotated. Upright on desktop web (see overlayRotationDeg).
+      {/* Game Over overlay - upright whatever the rink's turn (see cornerChips above).
           2 Player gets one card per seat instead, each in that player's half and turned to face
           them (SeatResultCards); this single card is Vs CPU's. */}
       {phase === 'gameOver' && aiPlayer === null && <SeatResultCards winner={winner} scores={scores} playerColor={playerColor} playerOnColor={playerOnColor} spots={seatSpots} onPlayAgain={() => resetGame(board)} onQuit={safeBack} />}
@@ -361,7 +342,7 @@ export default function GameScreen() {
       {aiPlayer === null && <SeatToasters spots={seatSpots} />}
       {phase === 'gameOver' && aiPlayer !== null && (
         <OverlayBackdrop style={styles.resultBackdrop}>
-          <OverlayCard style={[styles.resultCard, overlayRotationStyle]}>
+          <OverlayCard style={styles.resultCard}>
             <Icon source='trophy' size={64} color={playerColor[winner]} />
             <Text variant='headlineLarge' style={[styles.overlayTitle, { color: playerColor[winner], fontFamily: MONO_FONT }]}>
               Wins!
@@ -385,41 +366,26 @@ export default function GameScreen() {
       )}
 
       {/* Quit confirmation - now the fleet-shared @tastic/hud ConfirmDialog rather than a hand-
-      rolled overlay. Its rotation is the same physical-hold-compensating rotation the board/other
-      floating UI use (see rotationDeg's own comment above), not a fresh computation, except that
-      desktop web keeps it upright (see overlayRotationDeg).
+      rolled overlay, always upright.
       Trades this dialog's previous secondary-accent Quit button and MONO_FONT styling for the
       shared component's primary accent and default font - an accepted trade-off. */}
-      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} rotation={overlayRotationDeg} />
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} />
       {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
-      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} rotation={overlayRotationDeg} />
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
 
-      {/* Back + settings - anchored to the board's own top corners in LOCAL space (board.x/y), then
-          mapped to a real screen position via localToScreen using the SAME rotationDeg the board's
-          own container above is rotated by, so the pair travels (not just spins) to track wherever
-          the board's rotated top edge actually lands on screen - same technique Pong's own
-          back/settings chips use. Previously pinned to the real screen's raw top-left/top-right
-          (insets.top/left/right, never rotated or moved): correct only at rotationDeg 0; once
-          goalAxis flipped to 'horizontal' the board spun ±90° underneath while these stayed put,
-          landing in the wrong corner relative to the now-rotated board and never turning to stay
-          legible. Unlike BoxHockey's centerline placement (needed there because its board splits
-          face-to-face with P2's half rotated 180°), AirHockey's board is never rotated PER PLAYER -
-          only as a single unit for goalAxis - so one shared, non-neutral corner pair is still
-          correct; it just has to move and rotate with that unit rotation instead of ignoring it.
-          Desktop web is the exception: the page's own top corners, upright (see overlayRotationDeg above). */}
+      {/* Back + settings - in a tall window, anchored to the board's own top corners in LOCAL space
+          (board.x/y) and mapped to a real screen position via localToScreen. In a wide window (the
+          rink turned) and on desktop web, the window's own top corners instead (see cornerChips).
+          Upright either way. */}
       <View style={[styles.backButton, backSlot]}>
-        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={requestBack} accessibilityLabel='Back' />
+        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
       </View>
       <View style={[styles.settingsButton, settingsSlot]}>
-        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
+        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
       </View>
 
-      {/* Same physical-hold-compensating rotation the board itself uses (see rotationDeg's own
-      comment above, and overlayRotationDeg for desktop web), not a separate reading; previously omitted entirely,
-      leaving this dialog's content stuck unrotated in the 'horizontal' goalAxis orientation while
-      index.tsx/loadout.tsx's own dialogs correctly rotated. */}
-      <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} rotation={overlayRotationDeg} />
+      <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />
     </View>
   )
 }

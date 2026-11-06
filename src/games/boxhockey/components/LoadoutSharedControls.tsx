@@ -1,5 +1,5 @@
 import { IconButton } from '@rific/feedback-press'
-import { MenuOption, PopoverHost, PopoverRotation, SectionedDropdown, usePopoverHost } from '@tastic/hud'
+import { MenuOption, PopoverHost, SectionedDropdown, usePopoverHost } from '@tastic/hud'
 import { StyleSheet, View } from 'react-native'
 
 import { BoardVariant, FrictionLevel, InterceptSpeed, PuckSizeLevel, ShotPreviewLength, TipoffMode } from '@/games/boxhockey/types'
@@ -13,11 +13,6 @@ interface Props {
   // invisible to it and never close on an outside tap. Omit only if some future caller genuinely
   // wants this row fully independent (own host, own press-away wiring it'd have to provide itself).
   host?: PopoverHost
-  // Passed straight through to every SectionedDropdown trigger below - see SectionedDropdown's own
-  // `rotation` prop doc for why a trigger inside a @tastic/split-screen-style rotated zone (i.e.
-  // upside-down mode) needs this to keep its popover correctly on-screen. loadout.tsx computes the
-  // one live value via getViewRotation and passes it down here unchanged.
-  rotation?: PopoverRotation
   boardVariant: BoardVariant
   boardVariantOptions: MenuOption<BoardVariant>[]
   onBoardVariantChange: (value: BoardVariant) => void
@@ -69,7 +64,7 @@ interface Props {
 // SharedActionBand for why it needs to.
 export const LOADOUT_SHARED_CONTROLS_IDS = ['boardVariant', 'puckPhysics', 'slapShot', 'matchRules', 'shotPreviewLength']
 
-export function LoadoutSharedControls({ host: sharedHost, rotation, boardVariant, boardVariantOptions, onBoardVariantChange, rink, rinkOption, onRinkChange, friction, frictionOptions, onFrictionChange, puckSize, puckSizeOptions, onPuckSizeChange, interceptSpeed, interceptSpeedOptions, onInterceptSpeedChange, scoreToWin, scoreToWinOptions, onScoreToWinChange, shotPreviewLength, shotPreviewLengthOptions, onShotPreviewLengthChange, tipoffMode, tipoffModeOptions, onTipoffModeChange, onRandomize, onReset, accentColor, mutedColor, onAccentColor, dark }: Props) {
+export function LoadoutSharedControls({ host: sharedHost, boardVariant, boardVariantOptions, onBoardVariantChange, rink, rinkOption, onRinkChange, friction, frictionOptions, onFrictionChange, puckSize, puckSizeOptions, onPuckSizeChange, interceptSpeed, interceptSpeedOptions, onInterceptSpeedChange, scoreToWin, scoreToWinOptions, onScoreToWinChange, shotPreviewLength, shotPreviewLengthOptions, onShotPreviewLengthChange, tipoffMode, tipoffModeOptions, onTipoffModeChange, onRandomize, onReset, accentColor, mutedColor, onAccentColor, dark }: Props) {
   const ownHost = usePopoverHost()
   const host = sharedHost ?? ownHost
   // See PlayerSetupPanel's identical ownPopoverOpen comment - elevating this row for *any* open
@@ -98,7 +93,6 @@ export function LoadoutSharedControls({ host: sharedHost, rotation, boardVariant
         <SectionedDropdown
           id='boardVariant'
           host={host}
-          rotation={rotation}
           icon='view-grid-outline'
           accessibilityLabel='Board'
           sections={[
@@ -120,7 +114,6 @@ export function LoadoutSharedControls({ host: sharedHost, rotation, boardVariant
         <SectionedDropdown
           id='puckPhysics'
           host={host}
-          rotation={rotation}
           icon='speedometer-medium'
           accessibilityLabel='Puck physics'
           autoDismiss={false}
@@ -138,14 +131,13 @@ export function LoadoutSharedControls({ host: sharedHost, rotation, boardVariant
       tuning knob like friction/puck size, it's a distinct skill mechanic (mid-slide interception,
       see InterceptSpeed in types/index.ts), and deserves a name that says so rather than being a
       third unlabeled item buried in a "Puck physics" popover. */}
-        <SectionedDropdown id='slapShot' host={host} rotation={rotation} icon='hockey-sticks' accessibilityLabel='Slap shot' sections={[{ kind: 'single', id: 'interceptSpeed', options: interceptSpeedOptions, value: interceptSpeed, onChange: onInterceptSpeedChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+        <SectionedDropdown id='slapShot' host={host} icon='hockey-sticks' accessibilityLabel='Slap shot' sections={[{ kind: 'single', id: 'interceptSpeed', options: interceptSpeedOptions, value: interceptSpeed, onChange: onInterceptSpeedChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
         {/* Score to win and tip-off mode are both "how the match plays out" rules - combined for the
       same reason as puckPhysics above (and same autoDismiss={false}, for the same reason). */}
         <SectionedDropdown
           id='matchRules'
           host={host}
-          rotation={rotation}
           icon='flag-checkered'
           accessibilityLabel='Match rules'
           autoDismiss={false}
@@ -159,7 +151,7 @@ export function LoadoutSharedControls({ host: sharedHost, rotation, boardVariant
           dark={dark}
         />
 
-        <SectionedDropdown id='shotPreviewLength' host={host} rotation={rotation} icon='ray-start-arrow' accessibilityLabel='Shot preview length' sections={[{ kind: 'single', id: 'shotPreviewLength', options: shotPreviewLengthOptions, value: shotPreviewLength, onChange: onShotPreviewLengthChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+        <SectionedDropdown id='shotPreviewLength' host={host} icon='ray-start-arrow' accessibilityLabel='Shot preview length' sections={[{ kind: 'single', id: 'shotPreviewLength', options: shotPreviewLengthOptions, value: shotPreviewLength, onChange: onShotPreviewLengthChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
       </View>
     </View>
   )

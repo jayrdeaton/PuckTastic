@@ -55,7 +55,6 @@ describe("the pack store's storage key", () => {
     const state = store.getState()
 
     expect(selectGuideVersionSeen(state)).toBe(0)
-    expect(state.appSettings.lockOrientation).toBe(false)
     expect(state.opponent).toEqual({ seatTwo: 'cpu' })
     expect(await storage.getItem('persist:root')).toBe(oldSave)
   })
@@ -114,11 +113,11 @@ describe('a BoxHockey 1.0 save', () => {
     expect(playerSettings.select(store.getState())).toEqual({ ...DEFAULT_SETTINGS, boardVariant: 'gravity', scoreToWin: 7, controlScheme: { 1: 'stick', 2: 'push' } })
   })
 
-  it("moves 1.0's app-wide settings out of Box Hockey's, and its last mode into seat 2", async () => {
+  it("moves 1.0's Edge Guard out of Box Hockey's settings, drops its Lock Orientation, and moves its last mode into seat 2", async () => {
     const { store } = await launch({ 'boxhockey:root': oneZero() })
     const state = store.getState()
 
-    expect(state.appSettings).toEqual({ lockOrientation: true, lockedRotation: 90, deferBottomEdgeGestures: true })
+    expect(state.appSettings).toEqual({ deferBottomEdgeGestures: true })
     expect(state.opponent).toEqual({ seatTwo: 'cpu' })
     for (const field of ['gameMode', 'lockOrientation', 'lockedRotation', 'deferBottomEdgeGestures']) expect(root(state).boxhockeySettings['guest:1']).not.toHaveProperty(field)
   })
@@ -143,7 +142,7 @@ describe('a BoxHockey 1.0 save', () => {
 
     expect(state.opponent).toEqual({ seatTwo: 'person' })
     expect(selectGuideVersionSeen(state)).toBe(0)
-    expect(state.appSettings.lockOrientation).toBe(false)
+    expect(state.appSettings).toEqual({ deferBottomEdgeGestures: false })
   })
 
   it('starts fresh when the 1.0 save is unreadable', async () => {

@@ -1,8 +1,9 @@
+import { trackInterfaceOrientation } from '@tastic/core/interface-orientation'
 import { DeviceMotion } from 'expo-sensors'
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
 
-import { ORIENTATION_SENSOR_DEFAULT_INTERVAL_MS, TILT_UPDATE_INTERVAL_MS } from '@/shared/paddleGame/constants/game'
+import { TILT_UPDATE_INTERVAL_MS } from '@/shared/paddleGame/constants/game'
 import { BoardLayout, GamePhase, Player } from '@/shared/paddleGame/types'
 import { calibrateTiltBaseline, computeTiltTargetY, TiltBaseline } from '@/shared/paddleGame/utils/tiltInput'
 
@@ -14,10 +15,9 @@ export interface TiltInputLayerProps {
   // For detecting a FRESH entry into 'live' (every serve, not just the first) as a recalibration
   // trigger - see the phase effect below.
   phase: GamePhase
-  // Frozen for the whole round whenever tilt is active - see game.tsx's own
-  // useOrientationState(locked) call, which forces this never to change mid-round once
-  // tilt control is on, so this component never has to react to it changing.
-  rotation: 0 | 90 | -90
+  // The court's own drawn turn (the play screen's `rotation`): -90 in a tall window, 0 in a wide one.
+  // Read fresh each sample, since an iPad turning mid-round changes it.
+  rotation: 0 | -90
   board: BoardLayout
   // This player's CURRENT paddle Y, mirrored every render (not read once) - same pattern
   // KeyboardInputLayer's own `paddleY` prop uses, since (re)calibration needs the FRESH value at
@@ -36,6 +36,12 @@ export interface TiltInputLayerProps {
 //
 // Two independent effects, mirroring KeyboardInputLayer's own split: one owns the sensor
 // subscription's lifecycle, the other only watches `phase` to flag a recalibration.
+//
+// Steering follows the interface orientation (@tastic/core's trackInterfaceOrientation, on
+// expo-screen-orientation), since the OS turns the interface on a tablet. A turn mid-round
+// recalibrates where the paddle is, as a fresh serve does, so the paddle never jumps; steering stays
+// within TILT_MAX_DEG of the serve's hold, well short of what turns the interface. Phones are always
+// portrait.
 export default function TiltInputLayer({ player, enabled, phase, rotation, board, paddleY, onPaddleTargetY }: TiltInputLayerProps) {
   const latestRef = useRef({ player, rotation, board, paddleY, onPaddleTargetY })
   useEffect(() => {
@@ -53,32 +59,27 @@ export default function TiltInputLayer({ player, enabled, phase, rotation, board
 
     needsCalibrationRef.current = true
     DeviceMotion.setUpdateInterval(TILT_UPDATE_INTERVAL_MS)
+    const interfaceOrientation = trackInterfaceOrientation()
 
     const subscription = DeviceMotion.addListener((measurement) => {
       const { rotation: sensorRotation } = measurement
       if (!sensorRotation) return
       const { player, rotation, board, paddleY, onPaddleTargetY } = latestRef.current
+      const orientation = interfaceOrientation.current(measurement.orientation)
 
-      if (needsCalibrationRef.current) {
-        baselineRef.current = calibrateTiltBaseline(sensorRotation.beta, sensorRotation.gamma, paddleY)
+      if (needsCalibrationRef.current || baselineRef.current?.orientation !== orientation) {
+        baselineRef.current = calibrateTiltBaseline(sensorRotation.beta, sensorRotation.gamma, paddleY, orientation)
         needsCalibrationRef.current = false
         return
       }
 
-      const baseline = baselineRef.current
-      if (!baseline) return
-      const y = computeTiltTargetY(sensorRotation.beta, sensorRotation.gamma, baseline, rotation, board.paddleMinY, board.paddleMaxY)
+      const y = computeTiltTargetY(sensorRotation.beta, sensorRotation.gamma, baselineRef.current, rotation, board.paddleMinY, board.paddleMaxY)
       onPaddleTargetY(player, y)
     })
 
-    // Restores the shared DeviceMotion singleton's default sampling rate on every disable (pause,
-    // game over, or unmount) - not just final teardown - since expo-sensors' setUpdateInterval is a
-    // GLOBAL setting on that one singleton, not scoped to this listener (see TILT_UPDATE_INTERVAL_MS's
-    // own doc in constants/game.ts). Left elevated, it would keep @tastic/core's own
-    // useOrientationState sampling faster than it needs for the rest of the app session.
     return () => {
       subscription.remove()
-      DeviceMotion.setUpdateInterval(ORIENTATION_SENSOR_DEFAULT_INTERVAL_MS)
+      interfaceOrientation.remove()
     }
   }, [enabled])
 

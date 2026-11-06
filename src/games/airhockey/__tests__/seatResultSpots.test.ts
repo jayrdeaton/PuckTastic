@@ -6,9 +6,9 @@ describe('seatResultSpots', () => {
     expect(seatResultSpots(0, false)).toEqual({ 1: { rotation: 0, zone: 'bottom' }, 2: { rotation: 180, zone: 'top' } })
   })
 
-  it('splits a turned rink by the end each player defends, both upright', () => {
+  it('splits a turned rink (a wide window) by the end each player defends, player 1 on the left, both upright', () => {
     expect(seatResultSpots(90, false)).toEqual({ 1: { rotation: 0, zone: 'left' }, 2: { rotation: 0, zone: 'right' } })
-    expect(seatResultSpots(-90, true)).toEqual({ 1: { rotation: 0, zone: 'right' }, 2: { rotation: 0, zone: 'left' } })
+    expect(seatResultSpots(90, true)).toEqual({ 1: { rotation: 0, zone: 'left' }, 2: { rotation: 0, zone: 'right' } })
   })
 
   it('keeps both cards upright on a computer screen', () => {

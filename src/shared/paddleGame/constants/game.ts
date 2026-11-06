@@ -80,21 +80,10 @@ export const SOLO_LIVES = 3
 
 // ─── Tilt control (vsCpu/solo only - see tiltControlActiveFor in utils/gameMode.ts) ────────────
 
-// Fast DeviceMotion sampling while a tilt-controlled paddle is actively steering - much finer
-// grained than @tastic/core's own useOrientationState (see ORIENTATION_SENSOR_DEFAULT_INTERVAL_MS
-// below), which only needs to detect coarse hold changes every ~100ms. Continuous paddle steering
-// reads as noticeably laggier/steppier at that rate, so TiltInputLayer requests this faster one
-// ONLY while its own subscription is active - expo-sensors' DeviceMotion.setUpdateInterval is a
-// GLOBAL setting on the shared sensor singleton, not scoped per listener, so this has to be paired
-// with restoring the default below whenever tilt control isn't active.
+// Fast DeviceMotion sampling while a tilt-controlled paddle is actively steering: continuous paddle
+// steering reads as noticeably laggier/steppier at expo-sensors' slower default. TiltInputLayer is
+// the app's only DeviceMotion listener, so this global setting needs no restoring afterward.
 export const TILT_UPDATE_INTERVAL_MS = 20
-
-// Local mirror of @tastic/core's own useOrientationState.tsx UPDATE_INTERVAL_MS (100) - that
-// constant isn't exported by the package, so it can't be imported directly. TiltInputLayer restores
-// the shared DeviceMotion singleton to exactly this rate whenever its own subscription tears down
-// (disabled, paused, or unmounted), so the app's baseline orientation-hold-detection sampling rate
-// is never left elevated for the rest of the session after a tilt-controlled round ends.
-export const ORIENTATION_SENSOR_DEFAULT_INTERVAL_MS = 100
 
 // Degrees of beta/gamma drift from the calibrated baseline (see utils/tiltInput.ts) that produce
 // ZERO paddle movement - absorbs natural hand tremor and grip micro-adjustments that would
