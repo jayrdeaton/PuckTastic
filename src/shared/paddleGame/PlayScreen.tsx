@@ -26,6 +26,7 @@ import type { PaddleGameRecorders } from '@/shared/paddleGame/stats'
 import { Player, Settings } from '@/shared/paddleGame/types'
 import { computeBoardLayout } from '@/shared/paddleGame/utils/board'
 import { tiltControlActiveFor } from '@/shared/paddleGame/utils/gameMode'
+import { keepOnScreen } from '@/shared/paddleGame/utils/keepOnScreen'
 import { seatResultSpots } from '@/shared/paddleGame/utils/seatResultSpots'
 import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
@@ -58,6 +59,12 @@ function localToScreen(localX: number, localY: number, containerWidth: number, c
 }
 
 const SEATS: readonly Player[] = [1, 2]
+
+// The floating score labels' box (a headlineMedium digit or two, centered) and the back/settings
+// chips' (a 24 icon in IconButton's 48 box), halved, for placing them by their centers.
+const SCORE_HALF_WIDTH = 30
+const SCORE_HALF_HEIGHT = 20
+const CHIP_HALF_SIZE = 24
 // Vs CPU and Solo have one human, seat 1.
 const SOLO_SEATS: readonly Player[] = [1]
 
@@ -299,9 +306,11 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
 
   // ─── Floating UI placement ─────────────────────────────────────────────────
   // Score labels and the back/settings buttons all live OUTSIDE the board's own rotated container
-  // (they're floating UI, not part of the playing field - the board itself never rotates twice) and
-  // are individually positioned via localToScreen + their own small rotate transform, the same
-  // technique BoxHockey's MatchOverlays uses for its dialog card.
+  // (they're floating UI, not part of the playing field) and are individually positioned via
+  // localToScreen, one near each corner of the court, then kept on screen (keepOnScreen: on an iPad
+  // the court reaches the window's edge). They never turn with the court: the window is read upright,
+  // by the player at P1's end of a tall window too, so only player 2's own score turns, 180, to face
+  // them across a face-to-face court.
   const screenCenterX = width / 2
   const screenCenterY = height / 2
 
@@ -312,32 +321,26 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   // used to be what kept them out from under the back/settings chips in the page's top corners;
   // the court itself keeps clear of those now, see computeBoardLayout.)
   const scoreMarginAlong = isDesktopWeb ? 96 : scoreMargin
-  const p1ScorePos = localToScreen(board.x + scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
-  const p2ScorePos = localToScreen(board.x + board.width - scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
-  // Player 2 sits at the OPPOSITE end of a face-to-face court (see the rotation comment above) - its
-  // own label needs the opposing 180° reading direction to stay upright from player 2's own seat.
-  // For sideBySide (rotation 0) this is trivially still 0 - both players share the same viewing
-  // angle there, so no relative flip is needed.
-  const p2Rotation: 0 | 90 = rotation === -90 ? 90 : 0
+  const p1ScorePos = keepOnScreen(localToScreen(board.x + scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), SCORE_HALF_WIDTH, SCORE_HALF_HEIGHT, { width, height }, insets)
+  const p2ScorePos = keepOnScreen(localToScreen(board.x + board.width - scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), SCORE_HALF_WIDTH, SCORE_HALF_HEIGHT, { width, height }, insets)
+  // Player 2 sits at the OPPOSITE end of a face-to-face court (2 Player in a tall window, see the
+  // rotation comment above), so their own label turns 180 to read upright from their seat. Anywhere
+  // else (vs CPU, solo, side by side, one desktop screen) both labels are read from the same side.
+  const p2ScoreStyle = rotation === -90 && humanPlayers.length === 2 && !isDesktopWeb ? styles.turnedAround : undefined
 
   const buttonMargin = 16
-  const backPos = localToScreen(board.x + buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
-  const settingsPos = localToScreen(board.x + board.width - buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation)
-
-  const rotationStyle = rotation !== 0 ? { transform: [{ rotate: `${rotation}deg` }] } : undefined
-  const p2RotationStyle = p2Rotation !== 0 ? { transform: [{ rotate: `${p2Rotation}deg` }] } : undefined
+  // The court's own turn, for its container below only: nothing floating over it turns with it.
+  const courtRotationStyle = rotation !== 0 ? { transform: [{ rotate: `${rotation}deg` }] } : undefined
+  const backPos = keepOnScreen(localToScreen(board.x + buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), CHIP_HALF_SIZE, CHIP_HALF_SIZE, { width, height }, insets)
+  const settingsPos = keepOnScreen(localToScreen(board.x + board.width - buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), CHIP_HALF_SIZE, CHIP_HALF_SIZE, { width, height }, insets)
 
   // See @tastic/split-screen's needsSharedNeutralZone for the full reasoning. Board-corner
-  // positioning above (backPos/settingsPos + rotationStyle, P1's own reading direction) is fine for
-  // vsCpu/sideBySide, but breaks down for two-player faceToFace: unlike the score labels just above
-  // (two independent instances, each correctly rotated for its own player via p1/p2RotationStyle),
-  // there's only ONE back chip and ONE settings chip - a single shared element can't simultaneously
-  // read right-side-up for both players when they're seated on opposite ends. neutralZoneStyle below
-  // sidesteps that instead of trying to solve it: pinned to the real screen's own left/right edge,
-  // vertically centered, the same neutral midline LightCycles'/BoxHockey's in-match chips use - still
-  // carrying rotationStyle (not p2RotationStyle) since that ±90° reflects the whole board's own
-  // landscape-native-vs-portrait-hold orientation, not a P1-vs-P2 opposing flip, and stays needed
-  // even here for the icon to read upright at all.
+  // positioning above (backPos/settingsPos) is fine for vsCpu/sideBySide, but breaks down for
+  // two-player faceToFace: unlike the score labels just above (one per player, P2's turned to face
+  // them), there's only ONE back chip and ONE settings chip - a single shared element can't
+  // simultaneously sit in neither player's corner. neutralZoneStyle below pins them to the real
+  // screen's own left/right edge instead, vertically centered, the same neutral midline
+  // LightCycles'/BoxHockey's in-match chips use.
   const neutralZone = needsSharedNeutralZone(orientationMode, humanPlayers.length)
   // Desktop web: the page's own top corners, upright, the same spot as hud's CornerActionButtons on
   // every other screen. Both players share one screen, keyboard and mouse there, so there's no far
@@ -374,7 +377,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
             left: (width - containerWidth) / 2,
             top: (height - containerHeight) / 2
           },
-          rotationStyle
+          courtRotationStyle
         ]}
       >
         <Board board={board} ball={ball} paddles={paddles} phase={phase} showWalls={isDesktopWeb} bricks={bricks} soloMode={isSolo} />
@@ -400,15 +403,15 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
       Always mounted (inert whenever `enabled` is false), same convention as the other two layers. */}
       <TiltInputLayer player={humanPlayers[0]} enabled={tiltControlActive && !paused && phase !== 'gameOver'} phase={phase} rotation={rotation} board={board} paddleY={paddles[humanPlayers[0]].y} onPaddleTargetY={setPaddleTarget} />
 
-      {/* Score labels - plain react-native-paper Text, not on the Skia canvas, each individually
-          rotated to face its own player correctly (see p1/p2 rotation comment above) and anchored
-          near its own player's own corner of the board via localToScreen. */}
-      <View pointerEvents='none' style={[styles.floatingChip, { left: p1ScorePos.x - 30, top: p1ScorePos.y - 20 }, rotationStyle]}>
+      {/* Score labels - plain react-native-paper Text, not on the Skia canvas, each anchored near its
+          own player's own corner of the board via localToScreen, upright (player 2's turned to face
+          them across a face-to-face court, see p2ScoreStyle above). */}
+      <View pointerEvents='none' style={[styles.floatingChip, styles.scoreSlot, { left: p1ScorePos.x - SCORE_HALF_WIDTH, top: p1ScorePos.y - SCORE_HALF_HEIGHT }]}>
         <Text variant='headlineMedium' style={{ color: playerColor[1], fontFamily: MONO_FONT }}>
           {scores[0]}
         </Text>
       </View>
-      <View pointerEvents='none' style={[styles.floatingChip, { left: p2ScorePos.x - 30, top: p2ScorePos.y - 20 }, p2RotationStyle]}>
+      <View pointerEvents='none' style={[styles.floatingChip, styles.scoreSlot, { left: p2ScorePos.x - SCORE_HALF_WIDTH, top: p2ScorePos.y - SCORE_HALF_HEIGHT }, p2ScoreStyle]}>
         <Text variant='headlineMedium' style={{ color: playerColor[2], fontFamily: MONO_FONT }}>
           {scores[1]}
         </Text>
@@ -416,8 +419,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
 
       {/* Back + settings - see neutralZone's own doc above for the two treatments. Board-corner
           (vsCpu/sideBySide): floating chips near the board's own bottom corners (offset from the
-          score labels, which sit near the top corners), each rotated as a unit via the same
-          `rotation` so their icon reads upright given the current hold. Neutral-edge (two-player
+          score labels, which sit near the top corners), upright. Neutral-edge (two-player
           faceToFace): pinned to the real screen's own left/right edge instead, vertically centered,
           reachable and legible from either seat. Desktop web: the page's own top corners (see
           backSlot above). */}
@@ -433,18 +435,18 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
       ) : neutralZone ? (
         <>
           <View style={[styles.neutralSlot, { left: insets.left + 8 }]}>
-            <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={requestBack} accessibilityLabel='Back' />
+            <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
           </View>
           <View style={[styles.neutralSlot, { right: insets.right + 8 }]}>
-            <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
+            <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
           </View>
         </>
       ) : (
         <>
-          <View style={[styles.floatingChip, { left: backPos.x - 24, top: backPos.y - 24 }, rotationStyle]}>
+          <View style={[styles.floatingChip, { left: backPos.x - CHIP_HALF_SIZE, top: backPos.y - CHIP_HALF_SIZE }]}>
             <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
           </View>
-          <View style={[styles.floatingChip, { left: settingsPos.x - 24, top: settingsPos.y - 24 }, rotationStyle]}>
+          <View style={[styles.floatingChip, { left: settingsPos.x - CHIP_HALF_SIZE, top: settingsPos.y - CHIP_HALF_SIZE }]}>
             <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
           </View>
         </>
@@ -460,7 +462,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
       {phase === 'gameOver' &&
         (isSolo ? (
           <OverlayBackdrop style={styles.resultBackdrop}>
-            <OverlayCard style={[styles.resultCard, rotationStyle]}>
+            <OverlayCard style={styles.resultCard}>
               <Icon source={lives > 0 ? 'trophy' : 'heart-broken'} size={64} color={playerColor[1]} />
               <Text variant='headlineLarge' style={[styles.overlayTitle, { color: playerColor[1], fontFamily: MONO_FONT }]}>
                 {lives > 0 ? 'Cleared!' : 'Out of Lives'}
@@ -483,7 +485,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
           <SeatResultCards winner={winner} scores={scores} playerColor={playerColor} playerOnColor={playerOnColor} spots={seatSpots} onPlayAgain={() => resetGame(board)} onQuit={safeBack} />
         ) : (
           <OverlayBackdrop style={styles.resultBackdrop}>
-            <OverlayCard style={[styles.resultCard, rotationStyle]}>
+            <OverlayCard style={styles.resultCard}>
               <Icon source='trophy' size={64} color={playerColor[winner]} />
               <Text variant='headlineLarge' style={[styles.overlayTitle, { color: playerColor[winner], fontFamily: MONO_FONT }]}>
                 Wins!
@@ -551,6 +553,9 @@ const styles = StyleSheet.create({
   resultBackdrop: { paddingHorizontal: 24 },
   resultCard: { width: '100%' },
   root: { flex: 1 },
+  scoreSlot: { alignItems: 'center', height: SCORE_HALF_HEIGHT * 2, justifyContent: 'center', width: SCORE_HALF_WIDTH * 2 },
+  // Player 2's score in a face-to-face court, read from across the table.
+  turnedAround: { transform: [{ rotate: '180deg' }] },
   // Marginless - sits between the "Wins!" title and the score line, both of which already carry
   // this card's own vertical gap (OverlayCard's own `gap`), so this row needs no extra spacing
   // of its own to read as one more line in that same stack.
