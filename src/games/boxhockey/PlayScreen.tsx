@@ -1,17 +1,16 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
 import { callWorkletCallback, useKeepAwake, useWorkletCallback } from '@rific/core'
-import { Button, IconButton, useVibration } from '@rific/feedback-press'
+import { Button, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { useBackgroundPause, useOrientationState, useSettledWindowDimensions } from '@tastic/core'
 import { ConfirmDialog, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { liveplayActions, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
+import { liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { Icon, Text } from 'react-native-paper'
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
-import { type EdgeInsets, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 import { useDispatch } from 'react-redux'
 import type { Action, Dispatch } from 'redux'
@@ -151,8 +150,8 @@ export default function GameScreen() {
   useTripleTap(state, aiPlayer, aiDifficulty, paused, { tripleTapPress, tripleTapSwipe, tripleTapClashEnd })
 
   // A pause can land mid-way through a CPU windup or intercept: a background pause anywhere, and on
-  // desktop web a dialog too, since the corner buttons stay up through every phase there (see
-  // cornerButtonsVisible). useAIOpponent's timer chain can't pick a half-finished windup back up.
+  // desktop web a dialog too, since the back and settings chips stay up through every phase there (the
+  // shell's MatchChips). useAIOpponent's timer chain can't pick a half-finished windup back up.
   // Dropping the aim returns the turn to 'idle', so the CPU plans a fresh shot once play resumes. A
   // human can't be mid-drag then: either the app left, or the one mouse just pressed a button. In
   // every other phase this is a no-op (see AIM_CANCEL).
@@ -215,14 +214,6 @@ export default function GameScreen() {
   // High-contrast retro look, matching the home screen: literal black/white by appearance, not
   // auto-paper's own (slightly tinted) background role.
   const bg = dark ? '#000000' : '#FFFFFF'
-  const fg = dark ? '#FFFFFF' : '#000000'
-  // Back/settings chip background - semi-opaque bg (not solid, and not fg-inverted like the rest
-  // of this screen's chips) now that the walls/goal line they used to sit on read much thinner
-  // (see WALL_THICKNESS/GOAL_LINE_STROKE_WIDTH in constants/game.ts): a solid opaque fg chip stood
-  // out fine against the old thick wall right at the board edge, but against the thin line it now
-  // reads as a heavier, disconnected UI slab. Semi-opaque bg lets the board show through at the
-  // edges so the chip melds with the board instead of sitting on top of it.
-  const cornerButtonBg = dark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)'
 
   // Per-player color pair, shared by the Game Over and quit-confirmation overlays below so a
   // given player's number/name reads in their own color everywhere on this screen, not just on
@@ -922,7 +913,7 @@ export default function GameScreen() {
       </View>
 
       {/* Back + settings chips live in MatchOverlays below, beside its dialogs (see its own comment). */}
-      <MatchOverlays phase={phase} scores={scores} winner={winner} loser={loser} playerColor={playerColor} playerOnColor={playerOnColor} twoPlayer={aiPlayer === null} onResetGame={() => resetGame(board)} confirmVisible={confirmVisible} cancelBack={cancelBack} settingsOpen={settingsOpen} onSettingsDismiss={() => setSettingsOpen(false)} onSettingsOpen={() => setSettingsOpen(true)} board={board} insets={insets} boardAreaMarginTop={boardAreaMarginTop} fg={fg} cornerButtonBg={cornerButtonBg} desktopWeb={isDesktopWeb} onBackPress={requestBack} backgroundPaused={backgroundPaused} onResume={resume} />
+      <MatchOverlays phase={phase} scores={scores} winner={winner} loser={loser} playerColor={playerColor} playerOnColor={playerOnColor} twoPlayer={aiPlayer === null} onResetGame={() => resetGame(board)} confirmVisible={confirmVisible} cancelBack={cancelBack} settingsOpen={settingsOpen} onSettingsDismiss={() => setSettingsOpen(false)} onSettingsOpen={() => setSettingsOpen(true)} board={board} boardAreaMarginTop={boardAreaMarginTop} desktopWeb={isDesktopWeb} onBackPress={requestBack} backgroundPaused={backgroundPaused} onResume={resume} />
     </View>
   )
 }
@@ -946,17 +937,11 @@ interface MatchOverlaysProps {
   // Opens the settings dialog - lives here, not just onSettingsDismiss, now that the chip button
   // that triggers it (see the chip JSX below) is rendered here too, alongside the dialog itself.
   onSettingsOpen: () => void
-  // GameScreen's own board layout/insets - needed here only for the back/settings chips' position
-  // (see their own comment below), not for anything this component already renders.
+  // GameScreen's own board layout - needed here only for the back/settings chips' center line.
   board: BoardLayout
-  insets: EdgeInsets
   // GameScreen's own real physical Y-offset of boardArea (see its own doc comment there).
   boardAreaMarginTop: number
-  fg: string
-  cornerButtonBg: string
-  // GameScreen's isDesktopWeb. There the back/settings chips sit in the page's own top corners and
-  // stay up through every phase: both players share one screen and mouse, so there's no far seat
-  // for the centerline to stay neutral for, and no touch zone for a chip to sit inside.
+  // GameScreen's isDesktopWeb: where 2 Player's toasts and cards go (the chips read it themselves).
   desktopWeb: boolean
   onBackPress: () => void
   // GameScreen's useBackgroundPause latch and its resume, for the Paused dialog below.
@@ -969,7 +954,7 @@ interface MatchOverlaysProps {
 // identically-shaped MatchOverlays. The board is permanently 'faceToFace' (see GameScreen's own
 // comment above) and never turns, and nothing here turns for the device's hold either: the only turn
 // left is player 2's 180 on their own Game Over card and toasts (seatToastSpots).
-function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColor, twoPlayer, onResetGame, confirmVisible, cancelBack, settingsOpen, onSettingsDismiss, onSettingsOpen, board, insets, boardAreaMarginTop, fg, cornerButtonBg, desktopWeb, onBackPress, backgroundPaused, onResume }: MatchOverlaysProps) {
+function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColor, twoPlayer, onResetGame, confirmVisible, cancelBack, settingsOpen, onSettingsDismiss, onSettingsOpen, board, boardAreaMarginTop, desktopWeb, onBackPress, backgroundPaused, onResume }: MatchOverlaysProps) {
   // The window's shape, for where 2 Player's unlock toasts go (seatToastSpots).
   const { orientationMode: windowMode } = useOrientationState()
   // Each seat's half and reading angle, shared by 2 Player's Game Over cards and unlock toasts.
@@ -979,29 +964,14 @@ function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColo
   // Quit's outlined label is cardFg, the card's own text color, not Paper's default (the theme's
   // primary), so neither seat's card shows another seat's color (Jay, 2026-10-20).
   const { fg: cardFg, fgMuted } = useOverlayCardColors()
-  // Corner buttons (back/settings) fade out during an active drag or swing rather than just
-  // disappearing - FAB's own `visible` prop used to provide this for free, but the plain IconButton
-  // used here now (matching index.tsx/loadout.tsx's bare-icon style) has no equivalent, so it's
-  // rebuilt directly. Covers 'striking' and 'simulating' as well as 'aiming': not just gameplay
-  // polish - it closes the window where a CPU turn's own windup/shoot/settle timer chain (see
-  // useAIOpponent.ts) could otherwise get interrupted mid-flight by a just-opened dialog. With all
-  // three phases covered, a dialog can only ever open while nothing in that chain is pending; a
-  // background pause can still land mid-chain, so it cancels the aim instead (see the aimCancel
-  // effect in GameScreen). Desktop web keeps them up through every phase (see desktopWeb's own doc),
-  // so a player can always back out; the same aimCancel effect covers a dialog opened mid-chain there.
-  // 'simulating' is also just the puck actually moving - per explicit feedback, the chips should
-  // stay out of the way for that whole stretch, not reappear the instant a shot is struck while the
-  // puck is still in motion. Lives here (not GameScreen, where these buttons used to render) beside
-  // the dialogs.
-  const cornerButtonsVisible = desktopWeb || (phase !== 'aiming' && phase !== 'striking' && phase !== 'simulating')
-  const cornerButtonsOpacity = useSharedValue(1)
-  useEffect(() => {
-    cornerButtonsOpacity.value = withTiming(cornerButtonsVisible ? 1 : 0, { duration: 150 })
-  }, [cornerButtonsVisible]) // eslint-disable-line react-hooks/exhaustive-deps
-  const cornerButtonsStyle = useAnimatedStyle(() => ({ opacity: cornerButtonsOpacity.value }))
-  // Desktop web: the page's top corners, same spot as hud's CornerActionButtons on every other screen.
-  const backSlot = desktopWeb ? { top: 8 + insets.top, left: 8 + insets.left } : { top: boardAreaMarginTop + board.y, height: board.height, left: insets.left }
-  const settingsSlot = desktopWeb ? { top: 8 + insets.top, right: 8 + insets.right } : { top: boardAreaMarginTop + board.y, height: board.height, right: insets.right }
+  // Back and settings are the shell's MatchChips (one rule for every game). Play is on through an
+  // aim, a swing and the puck sliding ('simulating'): hiding them for all three also closes the
+  // window where a CPU turn's windup/shoot/settle timer chain (see useAIOpponent.ts) could be cut
+  // short by a just-opened dialog; a background pause, or a dialog opened from desktop web's chips
+  // (always up there), can still land mid-chain, so GameScreen's aimCancel effect cancels the aim.
+  // The board is always face to face, so 2 Player puts them on the side edges at its center line.
+  const playing = phase === 'aiming' || phase === 'striking' || phase === 'simulating'
+  const centerLineY = boardAreaMarginTop + board.y + board.height / 2
 
   const progressMessage = (
     <>
@@ -1058,35 +1028,7 @@ function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColo
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
       <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={onResume} onCancel={safeBack} />
 
-      {/* Back + settings - vertically centered on the side edges at the dividing-wall centerline
-          (board.boardMarginTop + board.centerY in root-relative coordinates), rather than the top
-          corners used on every other screen. Unlike index.tsx/loadout.tsx, this screen is split
-          face-to-face with P2's half rotated 180°, so a top corner sits inside P2's near zone; the
-          wall centerline is the one strip of the board no puck can ever occupy, making it neutral
-          ground for both players. Deliberately centered on the board's own field (top: board.y,
-          height: board.height, both local to boardArea) rather than on root's full height the way
-          the very first version of this did - boardMarginTop/insets.bottom aren't generally equal
-          (see computeViewportSize/computeBoardLayout's own comments), so the screen's own vertical
-          midpoint and the board's own vertical midpoint are two different points; centering on
-          root would put these visibly off the wall on any device where those two insets differ.
-          Same single-constraint top+height anchor faceoffZoneTop/Bottom below already use, for the
-          same reason (see that comment) - mixing top+bottom here would still be exact today, but
-          top+height is what stays exact if this view is ever nested somewhere its own height isn't
-          implicitly root's. Filled circular chip (fg icon on a semi-opaque bg container - see
-          cornerButtonBg's own comment) rather than a bare icon, so it reads as a fixture bolted to
-          the wall instead of chrome floating over the ice; flush against the safe-area edge (no
-          extra inset padding, default IconButton margin zeroed) to sit as close to the true screen
-          edge as the notch/home-indicator allows. Both fade out together during an active drag,
-          swing, or simulating shot (cornerButtonsStyle above); pointerEvents follows the same
-          condition so a faded-out button can't still be tapped underneath the puck gesture layer. */}
-      <Animated.View pointerEvents={cornerButtonsVisible ? 'auto' : 'none'} style={[styles.backButton, backSlot, cornerButtonsStyle]}>
-        <IconButton icon='arrow-left' iconColor={fg} containerColor={cornerButtonBg} style={styles.chipButton} size={24} onPress={onBackPress} accessibilityLabel='Back' />
-      </Animated.View>
-
-      {/* Settings - mirrored on the opposite side edge, same centerline and chip treatment as the back button. */}
-      <Animated.View pointerEvents={cornerButtonsVisible ? 'auto' : 'none'} style={[styles.settingsButton, settingsSlot, cornerButtonsStyle]}>
-        <IconButton icon='cog' iconColor={fg} containerColor={cornerButtonBg} style={styles.chipButton} size={24} onPress={onSettingsOpen} accessibilityLabel='Settings' />
-      </Animated.View>
+      <MatchChips playing={playing} faceToFace={twoPlayer} centerLineY={centerLineY} onBack={onBackPress} onSettings={onSettingsOpen} />
 
       <SettingsDialog visible={settingsOpen} onDismiss={onSettingsDismiss} />
 
@@ -1098,14 +1040,8 @@ function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColo
 }
 
 const styles = StyleSheet.create({
-  // top/height come from the JSX (board.y/board.height, not a fixed value here) - see the render
-  // comment above for why this has to be the board's own field span, not root's full height.
-  backButton: { justifyContent: 'center', position: 'absolute' },
   boardArea: { flex: 1 },
   boardAreaTouchable: { flex: 1 },
-  // Cancels IconButton's own built-in 6px margin (react-native-paper's default Surface spacing)
-  // so nothing but the safe-area inset stands between the chip and the true screen edge.
-  chipButton: { margin: 0 },
   // Both anchored from `top` (not `bottom`+height for the lower one) so they resolve through the
   // exact same single-constraint layout path - mixing `bottom: 0` with a percentage `height` on an
   // absolutely-positioned view is a real, known Yoga/RN quirk (two simultaneous constraints to
@@ -1122,6 +1058,5 @@ const styles = StyleSheet.create({
   // width allowance (OverlayCard's maxWidth, 360) so its action row has room to sit side by side.
   resultBackdrop: { paddingHorizontal: 24 },
   resultCard: { width: '100%' },
-  root: { flex: 1 },
-  settingsButton: { justifyContent: 'center', position: 'absolute' }
+  root: { flex: 1 }
 })

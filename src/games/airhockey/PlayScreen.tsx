@@ -5,7 +5,7 @@ import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { humanSeatsFor, liveplayActions, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
+import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
@@ -24,8 +24,6 @@ import { DEFAULT_SETTINGS } from '@/games/airhockey/redux/settingsSlice'
 import { GameMode, GoalAxis, Player } from '@/games/airhockey/types'
 import { computeBoardLayout, computeLocalContainerSize } from '@/games/airhockey/utils/board'
 import { seatResultSpots } from '@/games/airhockey/utils/seatResultSpots'
-import { keepOnScreen } from '@/shared/keepOnScreen'
-import { MatchChips } from '@/shared/MatchChips'
 import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
 import { useGameSound } from '@/shared/useGameSound'
@@ -188,7 +186,6 @@ export default function GameScreen() {
 
   const { dark, colors: themeColors } = useAutoPaperTheme()
   const bg = dark ? '#000000' : '#FFFFFF'
-  const fg = dark ? '#FFFFFF' : '#000000'
   // The Game Over card and the dialogs' score lines sit on @tastic/hud's OverlayCard, so their text
   // takes its theme colors rather than this screen's literal black/white.
   // Quit's outlined label is cardFg, the card's own text color, not Paper's default (the theme's
@@ -263,41 +260,15 @@ export default function GameScreen() {
   }, [phase, scores, scoreToWin, aiPlayer, aiDifficulty, goalDoorHitCount, lastSelected, gameMode, recordMatchOutcome, profiles, showUnlockToasts])
 
   // ─── Floating UI placement ─────────────────────────────────────────────────
-  // Back/settings chips and the Game Over/quit-confirm cards all live OUTSIDE the board's own
-  // rotated container (see the JSX below), so each is individually positioned/rotated via
-  // rotationDeg rather than inheriting the container's own transform - same technique Pong's game
-  // screen uses for its own floating chips.
-  //
   // localToScreen's containerWidth/Height MUST be localSize.width/height (the pre-rotation
-  // container's own S×L size - always portrait-shaped, per computeLocalContainerSize's own doc),
-  // NOT logicalWidth/logicalHeight: board.x/y live in that same S×L local frame (computeBoardLayout
-  // returns board.width as S, board.height as L - see utils/board.ts), and it's THAT view, sized to
-  // localSize and centered in the real viewport, that rotationDeg actually rotates - confirmed by
-  // reproducing the original bug in the browser preview (using logicalWidth/Height here sent the
-  // back chip well off-screen once desktop web's letterboxing made S×L diverge from
-  // logicalWidth×logicalHeight).
-  const buttonMargin = 16
-  // With Settings.rink off on a screen with no top inset, the field starts right at the screen's
-  // edge, so the chips (24px half-height) are held 4px clear of it rather than hanging off-screen.
-  const buttonY = Math.max(board.y, 12) + buttonMargin
-  // Held inside the safe area (keepOnScreen): a rink that fills a phone's width puts a chip centered
-  // 16pt in from its corner partly off the screen's edge.
-  const backPos = keepOnScreen(localToScreen(board.x + buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg), 24, 24, { width, height }, insets)
-  const settingsPos = keepOnScreen(localToScreen(board.x + board.width - buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg), 24, 24, { width, height }, insets)
-  // A wide window turns the rink a quarter turn to fit, but the window itself is read upright, so the
-  // back/settings chips, the Game Over card and the dialogs never turn with it. The chips leave the
-  // rink for the window's own top corners then (and always on desktop web), the same spot as hud's
-  // CornerActionButtons on every other screen; following the rink would carry them down its left edge.
-  const cornerChips = isDesktopWeb || rotationDeg !== 0
-  // 2 Player in a tall window sits face to face, so the rink's top corners are player 2's end: the
-  // chips go to the side edges at the center line instead, between the two players, as Box Hockey's.
-  const centerLineChips = !cornerChips && humanPlayers.length === 2
+  // container's own S×L size, per computeLocalContainerSize's own doc): board.x/y live in that local
+  // frame, and it's THAT view, sized to localSize and centered in the real viewport, that rotationDeg
+  // rotates (using logicalWidth/Height here once sent the back chip off-screen on desktop web).
+  // The back and settings chips are the shell's MatchChips (one rule for every game): 2 Player in a
+  // tall window sits face to face, so they go to the side edges at the rink's center line, between
+  // the players; anywhere else, the window's top corners. Hidden while the puck is live.
+  const faceToFace = humanPlayers.length === 2 && rotationDeg === 0
   const centerLineY = localToScreen(board.x, board.y + board.height / 2, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg).y
-  const backSlot = cornerChips ? { top: 8 + insets.top, left: 8 + insets.left } : centerLineChips ? { top: centerLineY - 24, left: 8 + insets.left } : { left: backPos.x - 24, top: backPos.y - 24 }
-  const settingsSlot = cornerChips ? { top: 8 + insets.top, right: 8 + insets.right } : centerLineChips ? { top: centerLineY - 24, right: 8 + insets.right } : { left: settingsPos.x - 24, top: settingsPos.y - 24 }
-  // Faded out while the puck is live so they never cover play, back after a goal and at Game Over
-  // (Box Hockey's rule). Desktop web keeps them up in the page's corners, off the rink.
-  const chipsVisible = isDesktopWeb || phase !== 'live'
 
   const progressMessage = (
     <>
@@ -343,7 +314,7 @@ export default function GameScreen() {
       render is exactly right, not stale. */}
       <KeyboardInputLayer enabled={!paused} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddlePos={{ 1: paddles[1], 2: paddles[2] }} onPaddleTarget={setPaddleTarget} />
 
-      {/* Game Over overlay - upright whatever the rink's turn (see cornerChips above).
+      {/* Game Over overlay - upright whatever the rink's turn.
           2 Player gets one card per seat instead, each in that player's half and turned to face
           them (SeatResultCards); this single card is Vs CPU's. */}
       {phase === 'gameOver' && aiPlayer === null && <SeatResultCards winner={winner} scores={scores} playerColor={playerColor} playerOnColor={playerOnColor} spots={seatSpots} onPlayAgain={() => resetGame(board)} onQuit={safeBack} />}
@@ -385,11 +356,8 @@ export default function GameScreen() {
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
       <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
 
-      {/* Back + settings - vs CPU in a tall window, the rink's top corners (the CPU's end), kept on
-          screen; 2 Player in a tall window, the side edges at the center line (centerLineChips); a
-          wide window (the rink turned) and desktop web, the window's own top corners (cornerChips).
-          Upright always, and faded out while the puck is live except on desktop web (chipsVisible). */}
-      <MatchChips visible={chipsVisible} backSlot={backSlot} settingsSlot={settingsSlot} fg={fg} bg={bg} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
+      {/* Back + settings: the shell's MatchChips (see faceToFace above). */}
+      <MatchChips playing={phase === 'live'} faceToFace={faceToFace} centerLineY={centerLineY} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
 
       <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />
     </View>

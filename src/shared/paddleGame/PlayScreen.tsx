@@ -6,7 +6,7 @@ import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { ProfileChip } from '@tastic/profile'
-import { humanSeatsFor, liveplayActions, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
+import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
 import { needsSharedNeutralZone } from '@tastic/split-screen'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -16,7 +16,6 @@ import { useDispatch } from 'react-redux'
 import type { Action, Dispatch } from 'redux'
 
 import { keepOnScreen } from '@/shared/keepOnScreen'
-import { MatchChips } from '@/shared/MatchChips'
 import Board from '@/shared/paddleGame/components/BoardHost'
 import KeyboardInputLayer from '@/shared/paddleGame/components/KeyboardInputLayer'
 import TiltInputLayer from '@/shared/paddleGame/components/TiltInputLayer'
@@ -61,11 +60,10 @@ function localToScreen(localX: number, localY: number, containerWidth: number, c
 
 const SEATS: readonly Player[] = [1, 2]
 
-// The floating score labels' box (a headlineMedium digit or two, centered) and the back/settings
-// chips' (a 24 icon in IconButton's 48 box), halved, for placing them by their centers.
+// The floating score labels' box (a headlineMedium digit or two, centered), halved, for placing
+// them by their centers.
 const SCORE_HALF_WIDTH = 30
 const SCORE_HALF_HEIGHT = 20
-const CHIP_HALF_SIZE = 24
 // Vs CPU and Solo have one human, seat 1.
 const SOLO_SEATS: readonly Player[] = [1]
 
@@ -200,7 +198,6 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
 
   const { dark, colors: themeColors } = useAutoPaperTheme()
   const bg = dark ? '#000000' : '#FFFFFF'
-  const fg = dark ? '#FFFFFF' : '#000000'
   // The Game Over card and the dialogs' score lines sit on @tastic/hud's OverlayCard, so their text
   // takes its theme colors rather than this screen's literal black/white.
   // Quit's outlined label is cardFg, the card's own text color, not Paper's default (the theme's
@@ -306,9 +303,9 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   }, [phase, scores, scoreToWin, aiPlayer, aiDifficulty, ballSpeed, lastSelected, gameMode, recordMatchOutcome, isSolo, lives, bricks, recordSoloOutcome, profiles, showUnlockToasts])
 
   // ─── Floating UI placement ─────────────────────────────────────────────────
-  // Score labels and the back/settings buttons all live OUTSIDE the board's own rotated container
+  // The score labels live OUTSIDE the board's own rotated container
   // (they're floating UI, not part of the playing field) and are individually positioned via
-  // localToScreen, one near each corner of the court, then kept on screen (keepOnScreen: on an iPad
+  // localToScreen, near the court's top corners, then kept on screen (keepOnScreen: on an iPad
   // the court reaches the window's edge). They never turn with the court: the window is read upright,
   // by the player at P1's end of a tall window too, so only player 2's own score turns, 180, to face
   // them across a face-to-face court.
@@ -329,27 +326,13 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   // else (vs CPU, solo, side by side, one desktop screen) both labels are read from the same side.
   const p2ScoreStyle = rotation === -90 && humanPlayers.length === 2 && !isDesktopWeb ? styles.turnedAround : undefined
 
-  const buttonMargin = 16
   // The court's own turn, for its container below only: nothing floating over it turns with it.
   const courtRotationStyle = rotation !== 0 ? { transform: [{ rotate: `${rotation}deg` }] } : undefined
-  const backPos = keepOnScreen(localToScreen(board.x + buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), CHIP_HALF_SIZE, CHIP_HALF_SIZE, { width, height }, insets)
-  const settingsPos = keepOnScreen(localToScreen(board.x + board.width - buttonMargin, board.y + board.height - buttonMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), CHIP_HALF_SIZE, CHIP_HALF_SIZE, { width, height }, insets)
-
-  // See @tastic/split-screen's needsSharedNeutralZone for the full reasoning. Board-corner
-  // positioning above (backPos/settingsPos) is fine for vsCpu/sideBySide, but breaks down for
-  // two-player faceToFace: unlike the score labels just above (one per player, P2's turned to face
-  // them), there's only ONE back chip and ONE settings chip - a single shared element can't
-  // simultaneously sit in neither player's corner. neutralZoneStyle below pins them to the real
-  // screen's own left/right edge instead, vertically centered, the same neutral midline
-  // LightCycles'/BoxHockey's in-match chips use.
-  const neutralZone = needsSharedNeutralZone(orientationMode, humanPlayers.length)
-  // Desktop web: the page's own top corners, upright, the same spot as hud's CornerActionButtons on
-  // every other screen. Both players share one screen, keyboard and mouse there, so there's no far
-  // seat for the neutral edge to serve, and the page is always read upright.
-  const chipSlots = isDesktopWeb ? { back: { top: 8 + insets.top, left: 8 + insets.left }, settings: { top: 8 + insets.top, right: 8 + insets.right } } : neutralZone ? { back: { top: 0, bottom: 0, left: insets.left + 8 }, settings: { top: 0, bottom: 0, right: insets.right + 8 } } : { back: { left: backPos.x - CHIP_HALF_SIZE, top: backPos.y - CHIP_HALF_SIZE }, settings: { left: settingsPos.x - CHIP_HALF_SIZE, top: settingsPos.y - CHIP_HALF_SIZE } }
-  // Faded out while the puck is live so they never cover play, back between points and at Game Over
-  // (Box Hockey's rule). Desktop web keeps them up: they sit in the page's corners, off the court.
-  const chipsVisible = isDesktopWeb || phase !== 'live'
+  // The back and settings chips are the shell's MatchChips (one rule for every game): 2 Player face
+  // to face (see @tastic/split-screen's needsSharedNeutralZone) puts them on the side edges at the
+  // court's middle, between the players; anywhere else, the window's top corners. Hidden while the
+  // puck is live.
+  const faceToFace = needsSharedNeutralZone(orientationMode, humanPlayers.length)
 
   const progressMessage = isSolo ? (
     <Text style={{ color: fgMuted }}>
@@ -420,13 +403,8 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
         </Text>
       </View>
 
-      {/* Back + settings - see neutralZone's own doc above for the two treatments. Board-corner
-          (vsCpu/sideBySide): floating chips near the board's own bottom corners (offset from the
-          score labels, which sit near the top corners), upright. Neutral-edge (two-player
-          faceToFace): pinned to the real screen's own left/right edge instead, vertically centered,
-          reachable and legible from either seat. Desktop web: the page's own top corners. Off desktop
-          web they fade out while the puck is live (chipsVisible). */}
-      <MatchChips visible={chipsVisible} backSlot={chipSlots.back} settingsSlot={chipSlots.settings} fg={fg} bg={bg} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
+      {/* Back + settings: the shell's MatchChips (see faceToFace above). */}
+      <MatchChips playing={phase === 'live'} faceToFace={faceToFace} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
 
       {/* Game Over overlay - solo has no opponent, so it gets its own branch entirely: lives > 0
           means every brick was cleared (a win), lives <= 0 means the player ran out (see
