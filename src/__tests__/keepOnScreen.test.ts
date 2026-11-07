@@ -1,4 +1,4 @@
-import { keepOnScreen, ON_SCREEN_PAD } from '@/shared/paddleGame/utils/keepOnScreen'
+import { keepOnScreen, ON_SCREEN_PAD } from '@/shared/keepOnScreen'
 
 const window = { width: 1376, height: 1032 }
 const insets = { bottom: 20, left: 0, right: 0, top: 24 }

@@ -1,6 +1,6 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
 import { useKeepAwake } from '@rific/core'
-import { Button, IconButton, useVibration } from '@rific/feedback-press'
+import { Button, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDispatch } from 'react-redux'
 import type { Action, Dispatch } from 'redux'
 
+import { keepOnScreen } from '@/shared/keepOnScreen'
+import { MatchChips } from '@/shared/MatchChips'
 import Board from '@/shared/paddleGame/components/BoardHost'
 import KeyboardInputLayer from '@/shared/paddleGame/components/KeyboardInputLayer'
 import TiltInputLayer from '@/shared/paddleGame/components/TiltInputLayer'
@@ -26,7 +28,6 @@ import type { PaddleGameRecorders } from '@/shared/paddleGame/stats'
 import { Player, Settings } from '@/shared/paddleGame/types'
 import { computeBoardLayout } from '@/shared/paddleGame/utils/board'
 import { tiltControlActiveFor } from '@/shared/paddleGame/utils/gameMode'
-import { keepOnScreen } from '@/shared/paddleGame/utils/keepOnScreen'
 import { seatResultSpots } from '@/shared/paddleGame/utils/seatResultSpots'
 import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
@@ -345,8 +346,10 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   // Desktop web: the page's own top corners, upright, the same spot as hud's CornerActionButtons on
   // every other screen. Both players share one screen, keyboard and mouse there, so there's no far
   // seat for the neutral edge to serve, and the page is always read upright.
-  const backSlot = { top: 8 + insets.top, left: 8 + insets.left }
-  const settingsSlot = { top: 8 + insets.top, right: 8 + insets.right }
+  const chipSlots = isDesktopWeb ? { back: { top: 8 + insets.top, left: 8 + insets.left }, settings: { top: 8 + insets.top, right: 8 + insets.right } } : neutralZone ? { back: { top: 0, bottom: 0, left: insets.left + 8 }, settings: { top: 0, bottom: 0, right: insets.right + 8 } } : { back: { left: backPos.x - CHIP_HALF_SIZE, top: backPos.y - CHIP_HALF_SIZE }, settings: { left: settingsPos.x - CHIP_HALF_SIZE, top: settingsPos.y - CHIP_HALF_SIZE } }
+  // Faded out while the puck is live so they never cover play, back between points and at Game Over
+  // (Box Hockey's rule). Desktop web keeps them up: they sit in the page's corners, off the court.
+  const chipsVisible = isDesktopWeb || phase !== 'live'
 
   const progressMessage = isSolo ? (
     <Text style={{ color: fgMuted }}>
@@ -421,36 +424,9 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
           (vsCpu/sideBySide): floating chips near the board's own bottom corners (offset from the
           score labels, which sit near the top corners), upright. Neutral-edge (two-player
           faceToFace): pinned to the real screen's own left/right edge instead, vertically centered,
-          reachable and legible from either seat. Desktop web: the page's own top corners (see
-          backSlot above). */}
-      {isDesktopWeb ? (
-        <>
-          <View style={[styles.floatingChip, backSlot]}>
-            <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
-          </View>
-          <View style={[styles.floatingChip, settingsSlot]}>
-            <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
-          </View>
-        </>
-      ) : neutralZone ? (
-        <>
-          <View style={[styles.neutralSlot, { left: insets.left + 8 }]}>
-            <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
-          </View>
-          <View style={[styles.neutralSlot, { right: insets.right + 8 }]}>
-            <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
-          </View>
-        </>
-      ) : (
-        <>
-          <View style={[styles.floatingChip, { left: backPos.x - CHIP_HALF_SIZE, top: backPos.y - CHIP_HALF_SIZE }]}>
-            <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
-          </View>
-          <View style={[styles.floatingChip, { left: settingsPos.x - CHIP_HALF_SIZE, top: settingsPos.y - CHIP_HALF_SIZE }]}>
-            <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
-          </View>
-        </>
-      )}
+          reachable and legible from either seat. Desktop web: the page's own top corners. Off desktop
+          web they fade out while the puck is live (chipsVisible). */}
+      <MatchChips visible={chipsVisible} backSlot={chipSlots.back} settingsSlot={chipSlots.settings} fg={fg} bg={bg} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
 
       {/* Game Over overlay - solo has no opponent, so it gets its own branch entirely: lives > 0
           means every brick was cleared (a win), lives <= 0 means the player ran out (see
@@ -539,13 +515,8 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
 }
 
 const styles = StyleSheet.create({
-  chipButton: { margin: 0 },
   floatingChip: { position: 'absolute' },
   localContainer: { position: 'absolute' },
-  // neutralZone's own back/settings position - full screen height at a fixed left/right edge,
-  // button centered vertically via justifyContent, same shape as LightCycles'/BoxHockey's own
-  // neutral-midline chip slots (see neutralZone's own doc above for why).
-  neutralSlot: { alignItems: 'center', bottom: 0, justifyContent: 'center', position: 'absolute', top: 0 },
   overlayScore: {},
   overlayTitle: { fontWeight: 'bold' },
   // The single Game Over card, as ConfirmDialog's: room from the screen's edges, and the card's full

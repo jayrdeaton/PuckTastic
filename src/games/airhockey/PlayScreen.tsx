@@ -1,6 +1,6 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
 import { useKeepAwake } from '@rific/core'
-import { Button, IconButton, useVibration } from '@rific/feedback-press'
+import { Button, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
@@ -24,6 +24,8 @@ import { DEFAULT_SETTINGS } from '@/games/airhockey/redux/settingsSlice'
 import { GameMode, GoalAxis, Player } from '@/games/airhockey/types'
 import { computeBoardLayout, computeLocalContainerSize } from '@/games/airhockey/utils/board'
 import { seatResultSpots } from '@/games/airhockey/utils/seatResultSpots'
+import { keepOnScreen } from '@/shared/keepOnScreen'
+import { MatchChips } from '@/shared/MatchChips'
 import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
 import { useGameSound } from '@/shared/useGameSound'
@@ -278,15 +280,24 @@ export default function GameScreen() {
   // With Settings.rink off on a screen with no top inset, the field starts right at the screen's
   // edge, so the chips (24px half-height) are held 4px clear of it rather than hanging off-screen.
   const buttonY = Math.max(board.y, 12) + buttonMargin
-  const backPos = localToScreen(board.x + buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
-  const settingsPos = localToScreen(board.x + board.width - buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
+  // Held inside the safe area (keepOnScreen): a rink that fills a phone's width puts a chip centered
+  // 16pt in from its corner partly off the screen's edge.
+  const backPos = keepOnScreen(localToScreen(board.x + buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg), 24, 24, { width, height }, insets)
+  const settingsPos = keepOnScreen(localToScreen(board.x + board.width - buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg), 24, 24, { width, height }, insets)
   // A wide window turns the rink a quarter turn to fit, but the window itself is read upright, so the
   // back/settings chips, the Game Over card and the dialogs never turn with it. The chips leave the
   // rink for the window's own top corners then (and always on desktop web), the same spot as hud's
   // CornerActionButtons on every other screen; following the rink would carry them down its left edge.
   const cornerChips = isDesktopWeb || rotationDeg !== 0
-  const backSlot = cornerChips ? { top: 8 + insets.top, left: 8 + insets.left } : { left: backPos.x - 24, top: backPos.y - 24 }
-  const settingsSlot = cornerChips ? { top: 8 + insets.top, right: 8 + insets.right } : { left: settingsPos.x - 24, top: settingsPos.y - 24 }
+  // 2 Player in a tall window sits face to face, so the rink's top corners are player 2's end: the
+  // chips go to the side edges at the center line instead, between the two players, as Box Hockey's.
+  const centerLineChips = !cornerChips && humanPlayers.length === 2
+  const centerLineY = localToScreen(board.x, board.y + board.height / 2, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg).y
+  const backSlot = cornerChips ? { top: 8 + insets.top, left: 8 + insets.left } : centerLineChips ? { top: centerLineY - 24, left: 8 + insets.left } : { left: backPos.x - 24, top: backPos.y - 24 }
+  const settingsSlot = cornerChips ? { top: 8 + insets.top, right: 8 + insets.right } : centerLineChips ? { top: centerLineY - 24, right: 8 + insets.right } : { left: settingsPos.x - 24, top: settingsPos.y - 24 }
+  // Faded out while the puck is live so they never cover play, back after a goal and at Game Over
+  // (Box Hockey's rule). Desktop web keeps them up in the page's corners, off the rink.
+  const chipsVisible = isDesktopWeb || phase !== 'live'
 
   const progressMessage = (
     <>
@@ -374,16 +385,11 @@ export default function GameScreen() {
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
       <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
 
-      {/* Back + settings - in a tall window, anchored to the board's own top corners in LOCAL space
-          (board.x/y) and mapped to a real screen position via localToScreen. In a wide window (the
-          rink turned) and on desktop web, the window's own top corners instead (see cornerChips).
-          Upright either way. */}
-      <View style={[styles.backButton, backSlot]}>
-        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={requestBack} accessibilityLabel='Back' />
-      </View>
-      <View style={[styles.settingsButton, settingsSlot]}>
-        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
-      </View>
+      {/* Back + settings - vs CPU in a tall window, the rink's top corners (the CPU's end), kept on
+          screen; 2 Player in a tall window, the side edges at the center line (centerLineChips); a
+          wide window (the rink turned) and desktop web, the window's own top corners (cornerChips).
+          Upright always, and faded out while the puck is live except on desktop web (chipsVisible). */}
+      <MatchChips visible={chipsVisible} backSlot={backSlot} settingsSlot={settingsSlot} fg={fg} bg={bg} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
 
       <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />
     </View>
@@ -391,8 +397,6 @@ export default function GameScreen() {
 }
 
 const styles = StyleSheet.create({
-  backButton: { position: 'absolute' },
-  chipButton: { margin: 0 },
   // Deliberately NOT position: 'absolute' - it needs to stay a normal flex child of `viewport`
   // so that parent's alignItems/justifyContent: 'center' actually centers it (an absolutely
   // positioned child ignores its parent's flex alignment entirely and defaults to pinning at
@@ -406,6 +410,5 @@ const styles = StyleSheet.create({
   resultBackdrop: { paddingHorizontal: 24 },
   resultCard: { width: '100%' },
   root: { flex: 1 },
-  settingsButton: { position: 'absolute' },
   viewport: { alignItems: 'center', justifyContent: 'center', left: 0, position: 'absolute', top: 0 }
 })
