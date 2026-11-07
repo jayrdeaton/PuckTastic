@@ -123,6 +123,9 @@ export interface GameState {
   ball: BallState
   paddles: PaddleStates
   lastScoredBy: Player | null
+  // Who serves the next ball from their own paddle (Breaker: player 1 first, then whoever lost the
+  // last ball, always player 1 alone), or null for a serve from the middle (Paddles).
+  server: Player | null
   // Bumped on every TICK where stepPhysics reports a wall bounce - an ever-incrementing counter
   // (not a plain boolean), same reason AirHockey's identical bounceCount exists: a boolean alone
   // can't tell "a NEW bounce just happened" apart from "one already happened a tick ago" across
@@ -132,8 +135,8 @@ export interface GameState {
   // needs a conditional just to skip the brick pass. Lives in GameState, not BoardLayout: unlike
   // AirHockey/BoxHockey's permanently-static obstacles, bricks are destructible round-progress
   // state, and BoardLayout is recomputed on every resize/rotation - storing destroyed-state there
-  // would silently regenerate a fully-intact field on a mid-round rotation. Rescaled (not
-  // regenerated) on RESCALE - see rescaleBricks in utils/board.ts.
+  // would silently regenerate a fully-intact field on a mid-round rotation. Laid out again for the
+  // new board on RESCALE, each brick keeping whether it's broken (see useGameState).
   bricks: Brick[]
   // Meaningful only for 'solo' (0 otherwise) - decremented on a miss, <= 0 ends the round as a loss.
   lives: number

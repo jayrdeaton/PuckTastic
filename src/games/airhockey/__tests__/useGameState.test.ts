@@ -10,7 +10,7 @@ function idleState(): GameState {
   return makeReducer(5, 0.986)(
     // Seed via RESET so the fixture always matches makeInitialState's own shape, rather than
     // hand-duplicating it here and risking drift.
-    { phase: 'idle', scores: [0, 0], puck: { x: 0, y: 0, vx: 0, vy: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredGoal: null, bounceCount: 0, goalDoorHitCount: 0, lastGoalDoorSide: null, pocketDoorHit: null },
+    { phase: 'idle', scores: [0, 0], puck: { x: 0, y: 0, vx: 0, vy: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredGoal: null, bounceCount: 0, goalDoorHitCount: 0, lastGoalDoorSide: null, pocketDoorHit: null, puckInPlay: false },
     { type: 'RESET', board }
   )
 }
@@ -199,5 +199,37 @@ describe('stranded puck re-serve', () => {
     expect(doorHit.goalDoorHitCount).toBe(inPlay.goalDoorHitCount + 1)
     expect(doorHit.lastGoalDoorSide).toBe('top')
     expect(doorHit.pocketDoorHit).toBe('top')
+  })
+})
+
+// The back and settings chips stay up until the puck is in play (Jay, 2026-11-07): through every
+// faceoff, until a paddle first sets the puck moving, not from the moment 'live' begins.
+describe('puckInPlay', () => {
+  const restingTargets = (state: GameState) => ({ 1: { x: state.paddles[1].x, y: state.paddles[1].y }, 2: { x: state.paddles[2].x, y: state.paddles[2].y } })
+
+  it('starts false, and stays false through ticks while the puck sits at rest', () => {
+    const reducer = makeReducer(5, 0.986)
+    const state = liveState()
+    expect(state.puckInPlay).toBe(false)
+    const next = reducer(state, { type: 'TICK', board, dt: 1, targets: restingTargets(state) })
+    expect(next.phase).toBe('live')
+    expect(next.puckInPlay).toBe(false)
+  })
+
+  it('turns true once the puck moves, and stays true if it later comes to rest', () => {
+    const reducer = makeReducer(5, 0.986)
+    const state = liveState()
+    const struck = reducer({ ...state, puck: { ...state.puck, vx: 3, vy: 0 } }, { type: 'TICK', board, dt: 1, targets: restingTargets(state) })
+    expect(struck.puckInPlay).toBe(true)
+    const stopped = reducer({ ...struck, puck: { ...struck.puck, vx: 0, vy: 0 } }, { type: 'TICK', board, dt: 1, targets: restingTargets(struck) })
+    expect(stopped.puckInPlay).toBe(true)
+  })
+
+  it("goes back to false when a goal's faceoff puck is placed", () => {
+    const reducer = makeReducer(5, 0.986)
+    const scored: GameState = { ...liveState(), phase: 'goalScored', lastScoredGoal: 'top', puckInPlay: true }
+    const served = reducer(scored, { type: 'GOAL_SERVE', board, zoneIndex: 0 })
+    expect(served.phase).toBe('live')
+    expect(served.puckInPlay).toBe(false)
   })
 })

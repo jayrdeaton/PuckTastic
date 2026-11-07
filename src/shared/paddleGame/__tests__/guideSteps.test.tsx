@@ -70,7 +70,7 @@ describe('getGuideSteps', () => {
     for (const touch of [true, false]) {
       const { alone } = cardsFor(touch, undefined, true)
       expect(alone?.title).toBe('Play Alone')
-      expect(alone?.body).toBe('Pick Nobody for player 2, then clear every brick before your 3 lives run out.')
+      expect(alone?.body).toBe('Pick Solo, then clear every brick before your 3 lives run out.')
     }
   })
 

@@ -6,9 +6,9 @@ import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { ProfileChip } from '@tastic/profile'
-import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
+import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useProfiles } from '@tastic/shell'
 import { needsSharedNeutralZone } from '@tastic/split-screen'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -62,8 +62,19 @@ const SEATS: readonly Player[] = [1, 2]
 
 // The floating score labels' box (a headlineMedium digit or two, centered), halved, for placing
 // them by their centers.
-const SCORE_HALF_WIDTH = 30
-const SCORE_HALF_HEIGHT = 20
+// A score's box on screen (it's drawn upright, so these are screen width and height whatever the court's
+// turn), sized for its small digits (titleMedium in the mono font) and no bigger, so the box tucks in
+// between the side wall and Breaker's shared bricks (SHARED_BRICK_FIELD_Y_MARGIN_RATIO, 8% of the
+// court's width from each wall, about 27pt on a phone).
+const SCORE_HALF_WIDTH = 14
+const SCORE_HALF_HEIGHT = 12
+// Each score sits against the side wall, right beside the center line on its own player's side: this
+// far from the wall, and this far from the line.
+const SCORE_WALL_GAP = 4
+const SCORE_NET_GAP = 4
+// Faded in its player's color, so it reads as part of the court, as Box Hockey's score wedges do,
+// rather than a label on top of it.
+const SCORE_OPACITY = 0.55
 // Vs CPU and Solo have one human, seat 1.
 const SOLO_SEATS: readonly Player[] = [1]
 
@@ -126,7 +137,11 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   const containerWidth = rotation === 0 ? width : height
   const containerHeight = rotation === 0 ? height : width
 
-  const board = useMemo(() => computeBoardLayout(containerWidth, containerHeight, rotatedInsets, paddleSize), [containerWidth, containerHeight, rotatedInsets, paddleSize])
+  // The court's desktop shape (a fixed ratio with drawn walls, a browser window at least
+  // DESKTOP_WEB_MIN_WIDTH wide): the window's width, not whether this is a computer, and not the
+  // turned court's length.
+  const desktopBoard = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
+  const board = useMemo(() => computeBoardLayout(containerWidth, containerHeight, rotatedInsets, paddleSize, desktopBoard), [containerWidth, containerHeight, rotatedInsets, paddleSize, desktopBoard])
 
   // Settings/quit-confirm dialogs pause gameplay while open.
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -157,7 +172,19 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   useKeepAwake('game')
   const paused = settingsOpen || confirmVisible || backgroundPaused
 
-  const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, ballSpeed, gameMode, hasBricks, paused)
+  // A computer (the shell's useAtComputer: the web without a touch-first screen, at any width): its
+  // two players sit side by side, so nothing of player 2's is turned to face the far end, and they
+  // play on the keyboard or mouse, so the serve doesn't wait for touch.
+  const atComputer = useAtComputer()
+  // Each human player's finger down in their zone (TouchInputLayer). On a touch screen the serve, the
+  // opening one and each after a point, waits until every human player is touching (Jay,
+  // 2026-11-07): the back and settings chips stay up until it goes (they only hide while the ball is
+  // live), so there's time to back out, and no ball is served at nobody. Not at a computer, nor with
+  // tilt steering, where nobody touches the screen to play.
+  const [touching, setTouching] = useState<Record<Player, boolean>>({ 1: false, 2: false })
+  const handleTouchingChange = useCallback((player: Player, isTouching: boolean) => setTouching((current) => (current[player] === isTouching ? current : { ...current, [player]: isTouching })), [])
+  const serveHeld = !atComputer && !tiltControlActive && humanPlayers.some((player) => !touching[player])
+  const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, ballSpeed, gameMode, hasBricks, paused, serveHeld)
   const { phase, ball, paddles, scores, bounceCount, bricks, lives } = state
 
   // See hasProgressRef's own comment above - mirrors the real hasProgress check into it every
@@ -190,11 +217,10 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
 
   useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
 
-  const isDesktopWeb = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
   // 2 Player: each seat's half of the screen and the angle it reads at, for its Game Over card
   // (SeatResultCards) and its unlock toasts (SeatToasters) alike, so a player's toasts sit where
   // their card does, facing the same way.
-  const seatSpots = seatResultSpots(rotation, isDesktopWeb)
+  const seatSpots = seatResultSpots(rotation, atComputer)
 
   const { dark, colors: themeColors } = useAutoPaperTheme()
   const bg = dark ? '#000000' : '#FFFFFF'
@@ -313,18 +339,23 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   const screenCenterY = height / 2
 
   // Anchored to the board's OWN rect (board.x/y/width/height, not the raw container) so placement
-  // automatically respects both the rotated safe-area insets AND any desktop-web letterboxing.
-  const scoreMargin = 20
-  // On desktop web each label sits further in along the court's edge, out of its paddle's lane. (It
-  // used to be what kept them out from under the back/settings chips in the page's top corners;
-  // the court itself keeps clear of those now, see computeBoardLayout.)
-  const scoreMarginAlong = isDesktopWeb ? 96 : scoreMargin
-  const p1ScorePos = keepOnScreen(localToScreen(board.x + scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), SCORE_HALF_WIDTH, SCORE_HALF_HEIGHT, { width, height }, insets)
-  const p2ScorePos = keepOnScreen(localToScreen(board.x + board.width - scoreMarginAlong, board.y + scoreMargin, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), SCORE_HALF_WIDTH, SCORE_HALF_HEIGHT, { width, height }, insets)
+  // automatically respects both the rotated safe-area insets AND any desktop-web letterboxing. Each
+  // score sits small and faded against the court's top wall (local), right beside the center line on
+  // its own player's side (Jay, 2026-11-07: by the center line, subtle, as Box Hockey's wedges are; at
+  // the end wall, in line with the paddle, the paddle slid over it). The court's length runs along
+  // local x, so on a turned court (a tall window) a score's offset from the line is its screen height
+  // and its offset from the wall its screen width; side by side, the other way round.
+  const turned = rotation !== 0
+  const scoreHalfAlong = turned ? SCORE_HALF_HEIGHT : SCORE_HALF_WIDTH
+  const scoreHalfAcross = turned ? SCORE_HALF_WIDTH : SCORE_HALF_HEIGHT
+  const netX = board.x + board.width / 2
+  const scoreY = board.y + SCORE_WALL_GAP + scoreHalfAcross
+  const p1ScorePos = keepOnScreen(localToScreen(netX - SCORE_NET_GAP - scoreHalfAlong, scoreY, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), SCORE_HALF_WIDTH, SCORE_HALF_HEIGHT, { width, height }, insets)
+  const p2ScorePos = keepOnScreen(localToScreen(netX + SCORE_NET_GAP + scoreHalfAlong, scoreY, containerWidth, containerHeight, screenCenterX, screenCenterY, rotation), SCORE_HALF_WIDTH, SCORE_HALF_HEIGHT, { width, height }, insets)
   // Player 2 sits at the OPPOSITE end of a face-to-face court (2 Player in a tall window, see the
   // rotation comment above), so their own label turns 180 to read upright from their seat. Anywhere
-  // else (vs CPU, solo, side by side, one desktop screen) both labels are read from the same side.
-  const p2ScoreStyle = rotation === -90 && humanPlayers.length === 2 && !isDesktopWeb ? styles.turnedAround : undefined
+  // else (vs CPU, solo, side by side, at a computer) both labels are read from the same side.
+  const p2ScoreStyle = rotation === -90 && humanPlayers.length === 2 && !atComputer ? styles.turnedAround : undefined
 
   // The court's own turn, for its container below only: nothing floating over it turns with it.
   const courtRotationStyle = rotation !== 0 ? { transform: [{ rotate: `${rotation}deg` }] } : undefined
@@ -366,7 +397,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
           courtRotationStyle
         ]}
       >
-        <Board board={board} ball={ball} paddles={paddles} phase={phase} showWalls={isDesktopWeb} bricks={bricks} soloMode={isSolo} />
+        <Board board={board} ball={ball} paddles={paddles} phase={phase} showWalls={desktopBoard} bricks={bricks} soloMode={isSolo} />
       </View>
 
       {/* Touch input - deliberately a SIBLING of the board's own rotated container, not nested
@@ -376,7 +407,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
           still cover the full real screen and invert each touch by hand (see its own file for why the
           split axis itself has to vary with rotation, not just the coordinate math). Disabled outside
           live play (paused, or the match has ended) same as AirHockey's own gestureEnabled gate. */}
-      <TouchInputLayer humanPlayers={humanPlayers} enabled={!paused && phase !== 'gameOver'} containerHeight={containerHeight} rotation={rotation} onPaddleTargetY={setPaddleTarget} />
+      <TouchInputLayer humanPlayers={humanPlayers} enabled={!paused && phase !== 'gameOver'} containerHeight={containerHeight} rotation={rotation} onPaddleTargetY={setPaddleTarget} onTouchingChange={handleTouchingChange} />
 
       {/* Web-only, additive keyboard input - see that component's own doc for why it needs no
       rotation-awareness the way TouchInputLayer does. paddles[1].y/paddles[2].y are read fresh
@@ -389,19 +420,25 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
       Always mounted (inert whenever `enabled` is false), same convention as the other two layers. */}
       <TiltInputLayer player={humanPlayers[0]} enabled={tiltControlActive && !paused && phase !== 'gameOver'} phase={phase} rotation={rotation} board={board} paddleY={paddles[humanPlayers[0]].y} onPaddleTargetY={setPaddleTarget} />
 
-      {/* Score labels - plain react-native-paper Text, not on the Skia canvas, each anchored near its
-          own player's own corner of the board via localToScreen, upright (player 2's turned to face
-          them across a face-to-face court, see p2ScoreStyle above). */}
-      <View pointerEvents='none' style={[styles.floatingChip, styles.scoreSlot, { left: p1ScorePos.x - SCORE_HALF_WIDTH, top: p1ScorePos.y - SCORE_HALF_HEIGHT }]}>
-        <Text variant='headlineMedium' style={{ color: playerColor[1], fontFamily: MONO_FONT }}>
-          {scores[0]}
-        </Text>
-      </View>
-      <View pointerEvents='none' style={[styles.floatingChip, styles.scoreSlot, { left: p2ScorePos.x - SCORE_HALF_WIDTH, top: p2ScorePos.y - SCORE_HALF_HEIGHT }, p2ScoreStyle]}>
-        <Text variant='headlineMedium' style={{ color: playerColor[2], fontFamily: MONO_FONT }}>
-          {scores[1]}
-        </Text>
-      </View>
+      {/* Score labels - plain react-native-paper Text, not on the Skia canvas, small and faded
+          against the side wall beside the center line, each on its own player's side (see
+          p1ScorePos above), upright (player 2's turned to face them across a face-to-face court,
+          see p2ScoreStyle above). None in Breaker's solo round: with no opponent the scores never
+          move (its lives and bricks are on the Paused and Quit cards). */}
+      {!isSolo && (
+        <>
+          <View pointerEvents='none' style={[styles.floatingChip, styles.scoreSlot, { left: p1ScorePos.x - SCORE_HALF_WIDTH, top: p1ScorePos.y - SCORE_HALF_HEIGHT }]}>
+            <Text variant='titleMedium' style={{ color: playerColor[1], fontFamily: MONO_FONT, opacity: SCORE_OPACITY }}>
+              {scores[0]}
+            </Text>
+          </View>
+          <View pointerEvents='none' style={[styles.floatingChip, styles.scoreSlot, { left: p2ScorePos.x - SCORE_HALF_WIDTH, top: p2ScorePos.y - SCORE_HALF_HEIGHT }, p2ScoreStyle]}>
+            <Text variant='titleMedium' style={{ color: playerColor[2], fontFamily: MONO_FONT, opacity: SCORE_OPACITY }}>
+              {scores[1]}
+            </Text>
+          </View>
+        </>
+      )}
 
       {/* Back + settings: the shell's MatchChips (see faceToFace above). */}
       <MatchChips playing={phase === 'live'} faceToFace={faceToFace} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
@@ -480,11 +517,13 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
 
       {/* Quit confirmation - shared @tastic/hud dialog; accepts its primary accent + default font
           in place of this dialog's previous secondary-accent Quit button and MONO_FONT styling
-          (a deliberate trade-off for convergence onto the shared component). */}
-      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} rotation={rotation} />
+          (a deliberate trade-off for convergence onto the shared component). Upright, like every
+          dialog since the OS turns the interface: never handed the court's own quarter turn (it was
+          until 2026-11-07, so in a tall window Quit Match? and Paused lay on their side). */}
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} />
       {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
-      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} rotation={rotation} />
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
 
       {/* Upright: since @tastic/shell 0.5 the Settings dialog takes no turn of its own. */}
       <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />

@@ -43,7 +43,8 @@ function makeInitialState(board: BoardLayout): GameState {
     bounceCount: 0,
     goalDoorHitCount: 0,
     lastGoalDoorSide: null,
-    pocketDoorHit: null
+    pocketDoorHit: null,
+    puckInPlay: false
   }
 }
 
@@ -109,9 +110,9 @@ export function makeReducer(scoreToWin: number, friction: number) {
           // celebration's physical side is the inverse of the scoring player number.
           const lastScoredGoal = result.scored === 1 ? 'top' : 'bottom'
           if (scores[result.scored - 1] >= scoreToWin) {
-            return { ...state, phase: 'gameOver', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null }
+            return { ...state, phase: 'gameOver', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null, puckInPlay: false }
           }
-          return { ...state, phase: 'goalScored', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null }
+          return { ...state, phase: 'goalScored', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null, puckInPlay: false }
         }
 
         const bounceCount = result.bounced ? state.bounceCount + 1 : state.bounceCount
@@ -128,10 +129,13 @@ export function makeReducer(scoreToWin: number, friction: number) {
           const owner: Player = pocket === 'top' ? 2 : 1
           const goalCX = action.board.x + (action.board.goalStart + action.board.goalEnd) / 2
           const puckPos = faceoffZoneCenter(action.board, owner, result.x < goalCX ? 0 : 1)
-          return { ...state, phase: 'idle', puck: { ...puckPos, vx: 0, vy: 0 }, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null }
+          return { ...state, phase: 'idle', puck: { ...puckPos, vx: 0, vy: 0 }, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null, puckInPlay: false }
         }
 
-        return { ...state, puck: result, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit }
+        // In play from the first tick a paddle sets the puck moving; it stays so until the puck is
+        // next placed at rest (a goal, a re-serve), even if friction stops it mid-rally.
+        const puckInPlay = state.puckInPlay || result.vx !== 0 || result.vy !== 0
+        return { ...state, puck: result, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit, puckInPlay }
       }
 
       // Post-goal re-serve - see useGameState's own GOAL_SERVE_PAUSE_MS timer. Unlike BoxHockey
@@ -151,7 +155,8 @@ export function makeReducer(scoreToWin: number, friction: number) {
           phase: 'live',
           puck: { ...puckPos, vx: 0, vy: 0 },
           paddles: { 1: { ...p1, vx: 0, vy: 0 }, 2: { ...p2, vx: 0, vy: 0 } },
-          lastScoredGoal: null
+          lastScoredGoal: null,
+          puckInPlay: false
         }
       }
 

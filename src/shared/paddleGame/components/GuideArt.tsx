@@ -91,22 +91,25 @@ export function GuideScorePoint() {
   )
 }
 
-// Breaker's brick field: a block of bricks across the middle of the court, one already broken, with
-// both paddles for a versus round or only player 1's (and the far wall) for a round alone, the way
-// the play screen draws them.
+// Breaker's brick field, the way the play screen draws it: alone, rows of thin bricks wall to wall
+// near the far wall, with room beyond them; head to head, a thin band across the middle with both
+// paddles. One brick in the nearest row is already broken, and the puck is on its way to the gap.
 export function GuideBrickField({ alone = false }: { alone?: boolean }) {
   const { colors } = useAutoPaperTheme()
-  const rows = [0, 1, 2, 3, 4]
-  const cols = alone ? [0, 1, 2, 3] : [0, 1]
-  const left = alone ? 62 : 70
-  const label = alone ? 'One paddle facing a field of bricks' : 'A block of bricks between the two paddles'
+  const rows = alone ? 6 : 3
+  const margin = alone ? 0 : 8
+  const slotAcross = (COURT_INNER_HEIGHT - margin * 2) / BRICKS_PER_ROW
+  // The nearest row's near edge: three empty rows short of the far wall alone, centered on the
+  // middle head to head.
+  const near = alone ? COURT_INNER_WIDTH - FAR_WALL_WIDTH - (3 + rows) * BRICK_SLOT_DEPTH : COURT_INNER_WIDTH / 2 - (rows * BRICK_SLOT_DEPTH) / 2
+  const label = alone ? 'One paddle facing rows of bricks by the far wall' : 'A band of bricks between the two paddles'
 
   return (
     <View accessible accessibilityLabel={label} style={[styles.court, { borderColor: colors.onSurface }]}>
       <View style={[styles.courtPaddle, styles.courtPaddleLeft, { backgroundColor: colors.primary }]} />
       {alone ? <View style={[styles.farWall, { backgroundColor: colors.onSurface }]} /> : <View style={[styles.courtPaddle, styles.courtPaddleRight, { backgroundColor: colors.secondary }]} />}
-      {rows.flatMap((row) => cols.map((col) => (row === 2 && col === 0 ? null : <View key={`${row}-${col}`} style={[styles.brick, { left: left + col * (BRICK_W + 2), top: 14 + row * (BRICK_H + 2), backgroundColor: colors.onSurface }]} />)))}
-      <View style={[styles.puck, styles.puckAtBricks]} />
+      {Array.from({ length: rows }, (_, row) => Array.from({ length: BRICKS_PER_ROW }, (__, i) => (row === 0 && i === BROKEN_BRICK ? null : <View key={`${row}-${i}`} style={[styles.brick, { left: near + row * BRICK_SLOT_DEPTH + 1, top: margin + i * slotAcross + 1, width: BRICK_SLOT_DEPTH - 2, height: slotAcross - 2, backgroundColor: colors.onSurface }]} />)))}
+      <View style={[styles.puck, { left: near - 28, top: margin + (BROKEN_BRICK + 0.5) * slotAcross - 6 }]} />
     </View>
   )
 }
@@ -133,9 +136,14 @@ export function GuideSplitPhone() {
   )
 }
 
-// GuideBrickField's bricks.
-const BRICK_W = 12
-const BRICK_H = 14
+// GuideBrickField's bricks: eight across the court, each row this deep, and the one broken.
+const BRICKS_PER_ROW = 8
+const BRICK_SLOT_DEPTH = 7
+const BROKEN_BRICK = 3
+// The court's inside (styles.court less its border) and solo's far wall (styles.farWall).
+const COURT_INNER_WIDTH = 164
+const COURT_INNER_HEIGHT = 100
+const FAR_WALL_WIDTH = 4
 
 // GuideScorePoint's puck path, from player 1's paddle out past player 2's: [left, top] of each dot.
 const TRAIL: [number, number][] = [
@@ -152,11 +160,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   brick: {
-    borderRadius: 2,
-    height: BRICK_H,
+    borderRadius: 1,
     opacity: 0.6,
-    position: 'absolute',
-    width: BRICK_W
+    position: 'absolute'
   },
   centerLine: {
     bottom: 8,
@@ -266,11 +272,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 69,
     width: 12
-  },
-  // GuideBrickField's puck, on its way from player 1's paddle to the gap a broken brick left.
-  puckAtBricks: {
-    left: 40,
-    top: 47
   },
   trailDot: {
     borderRadius: 3,

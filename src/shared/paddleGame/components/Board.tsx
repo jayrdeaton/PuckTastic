@@ -23,6 +23,10 @@ export interface BoardProps {
   soloMode: boolean
 }
 
+// Solo's far wall on a touch screen: a thin line just inside the court's far edge, where the puck
+// bounces, a little stronger than the dashed center line.
+const FAR_LINE_WIDTH = 2
+
 export default function Board({ board, ball, paddles, phase, showWalls, bricks, soloMode }: BoardProps) {
   const { x, y, width, height, wallThickness, ballRadius, paddleWidth, paddleHeight } = board
   const { colors: themeColors, dark } = useAutoPaperTheme()
@@ -33,6 +37,7 @@ export default function Board({ board, ball, paddles, phase, showWalls, bricks, 
   // only saturated color on screen. The puck is Air Hockey's black disc with a white ring.
   const wallColor = dark ? '#FFFFFF' : '#000000'
   const centerLineColor = dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)'
+  const farLineColor = dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'
   const p1Color = themeColors.primary
   const p2Color = themeColors.secondary
 
@@ -78,8 +83,11 @@ export default function Board({ board, ball, paddles, phase, showWalls, bricks, 
         {/* Solo/Brickbreaker's far wall - unconditional (not gated by showWalls above), since it
             replaces P2's own edge/paddle rather than being a cosmetic desktop-web extra: without it
             the far edge would look identical to a normal scoring edge and the new bounce behavior
-            there would make no visual sense. Same shape AirHockey uses for its own side walls. */}
-        {soloMode && <ObstacleRect x={x + width} y={y - wallThickness} width={wallThickness} height={height + wallThickness * 2} color={wallColor} />}
+            there would make no visual sense. Where the other walls are drawn (desktop web) it's one
+            of them; on a touch screen, where the screen's own edges are the side walls, it's a thin
+            line in the court markings' color (Jay, 2026-11-07: the full wall read as a giant black
+            line across the top of a phone). */}
+        {soloMode && (showWalls ? <ObstacleRect x={x + width} y={y - wallThickness} width={wallThickness} height={height + wallThickness * 2} color={wallColor} /> : <Rect x={x + width - FAR_LINE_WIDTH} y={y} width={FAR_LINE_WIDTH} height={height} color={farLineColor} />)}
 
         {/* Bricks - destructible, filtered before mapping so a destroyed one simply stops
             rendering. Same fleet idiom AirHockey/BoxHockey use for their own (permanent) Obstacle

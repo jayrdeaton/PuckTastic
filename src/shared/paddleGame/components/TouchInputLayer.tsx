@@ -26,6 +26,9 @@ export interface TouchInputLayerProps {
   // Called with the LOCAL (board-space) Y only - a Pong paddle only ever moves on one axis (see
   // PaddleState's own doc comment in types/index.ts: x is permanently fixed by board.paddleX).
   onPaddleTargetY: (player: Player, y: number) => void
+  // Whether each player has a finger down in their zone (the play screen holds the serve until every
+  // human player does): true as a touch begins, false as it ends or is cancelled.
+  onTouchingChange: (player: Player, touching: boolean) => void
 }
 
 // Converts a real screen-space touch position back into the local board's Y coordinate by hand,
@@ -71,7 +74,7 @@ function screenToLocalY(absX: number, absY: number, screenCenterX: number, scree
 // the split as unconditionally left/right - see game.tsx's/this phase's own report for the full
 // reasoning (a literal always-left/right split leaves roughly half of each paddle's local-Y travel
 // range unreachable once rotation !== 0).
-export default function TouchInputLayer({ humanPlayers, enabled, containerHeight, rotation, onPaddleTargetY }: TouchInputLayerProps) {
+export default function TouchInputLayer({ humanPlayers, enabled, containerHeight, rotation, onPaddleTargetY, onTouchingChange }: TouchInputLayerProps) {
   const solo = humanPlayers.length === 1
   const { width: screenWidth, height: screenHeight } = useWindowDimensions()
 
@@ -79,9 +82,9 @@ export default function TouchInputLayer({ humanPlayers, enabled, containerHeight
   // callbacks - and therefore the Gesture objects built from them below - stay referentially stable
   // across renders (a Gesture object rebuilt on every layout/state tick can silently drop touches -
   // see AirHockey's own TouchInputLayer for the original repro).
-  const latestRef = useRef({ onPaddleTargetY, screenWidth, screenHeight, containerHeight, rotation })
+  const latestRef = useRef({ onPaddleTargetY, onTouchingChange, screenWidth, screenHeight, containerHeight, rotation })
   useEffect(() => {
-    latestRef.current = { onPaddleTargetY, screenWidth, screenHeight, containerHeight, rotation }
+    latestRef.current = { onPaddleTargetY, onTouchingChange, screenWidth, screenHeight, containerHeight, rotation }
   })
 
   const handleTouch = useCallback((player: Player, absX: number, absY: number) => {
@@ -94,6 +97,8 @@ export default function TouchInputLayer({ humanPlayers, enabled, containerHeight
   // directly: native code holds a scheduleOnRN target for as long as the gesture's cached worklet lives, which would pin this
   // component in memory forever.
   const touchKey = useWorkletCallback(handleTouch)
+  const handleTouching = useCallback((player: Player, touching: boolean) => latestRef.current.onTouchingChange(player, touching), [])
+  const touchingKey = useWorkletCallback(handleTouching)
 
   const makePlayerGesture = useCallback(
     (player: Player) =>
@@ -102,13 +107,19 @@ export default function TouchInputLayer({ humanPlayers, enabled, containerHeight
         .minDistance(0)
         .hitSlop({})
         .enabled(enabled)
+        .onBegin(() => {
+          scheduleOnRN(callWorkletCallback, touchingKey, player, true)
+        })
         .onStart((e) => {
           scheduleOnRN(callWorkletCallback, touchKey, player, e.absoluteX, e.absoluteY)
         })
         .onUpdate((e) => {
           scheduleOnRN(callWorkletCallback, touchKey, player, e.absoluteX, e.absoluteY)
+        })
+        .onFinalize(() => {
+          scheduleOnRN(callWorkletCallback, touchingKey, player, false)
         }),
-    [enabled, touchKey]
+    [enabled, touchKey, touchingKey]
   )
 
   const soloGesture = useMemo(() => (solo ? makePlayerGesture(humanPlayers[0]) : null), [solo, humanPlayers, makePlayerGesture])

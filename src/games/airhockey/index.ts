@@ -29,7 +29,9 @@ export const airHockey: GameDefinition = {
   seatTwo: ['cpu', 'person'],
   // 2 Player seats by the window's shape, as the rink does (see the play screen's goalAxis): face to
   // face in a tall window (a phone, always portrait), side by side in a wide one (a landscape iPad, a
-  // browser window), player 1 on the left.
+  // browser window), player 1 on the left. At a computer side by side whatever the window's shape
+  // (the shell's useAtComputer), as its Game Over cards are.
+  sideBySideAtComputer: true,
   sideBySideWhenWide: true,
   reducers: { ...playerSettings.reducers, airhockeyAchievements: achievementsReducer, airhockeyGuide: guide },
   Provider: GameStatsProvider,

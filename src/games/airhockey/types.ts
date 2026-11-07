@@ -163,6 +163,11 @@ export interface GameState {
   // or null. A puck rattling between the door and the pocket's back wall hits the door on every lap,
   // and only the first hit of each visit counts toward goalDoorHitCount (see useGameState's TICK).
   pocketDoorHit: GoalSide | null
+  // Whether the puck has moved since it was last placed at rest (the opening faceoff at center, a
+  // faceoff after a goal, a stranded puck re-served): false until a paddle first strikes it. The
+  // back and settings chips stay up until then (Jay, 2026-11-07: time to back out before play starts),
+  // since 'live' starts the moment a goal's faceoff puck lands, at rest.
+  puckInPlay: boolean
 }
 
 // ─── Stats & achievements ───────────────────────────────────────────────────

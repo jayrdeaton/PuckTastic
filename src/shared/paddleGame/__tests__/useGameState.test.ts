@@ -1,7 +1,7 @@
 import { BALL_SPEED_TIERS, SOLO_LIVES } from '@/shared/paddleGame/constants/game'
 import { makeReducer } from '@/shared/paddleGame/hooks/useGameState'
 import { GameState } from '@/shared/paddleGame/types'
-import { computeBoardLayout } from '@/shared/paddleGame/utils/board'
+import { buildSharedBrickField, computeBoardLayout, servingBall } from '@/shared/paddleGame/utils/board'
 
 const insets = { top: 0, bottom: 0, left: 0, right: 0 }
 const board = computeBoardLayout(900, 400, insets, 'medium')
@@ -10,7 +10,7 @@ function idleState(): GameState {
   return makeReducer(5, 'medium')(
     // Seed via RESET so the fixture always matches makeInitialState's own shape, rather than
     // hand-duplicating it here and risking drift - same discipline AirHockey's own test file uses.
-    { phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, bounceCount: 0, bricks: [], lives: 0 },
+    { phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, server: null, bounceCount: 0, bricks: [], lives: 0 },
     { type: 'RESET', board }
   )
 }
@@ -213,7 +213,7 @@ describe('TICK substep loop - brick tunneling regression', () => {
     // bricksEnabled on a twoPlayer reducer - exercises the shared brick infrastructure via the
     // Bricks toggle path, same substep/collision code solo also relies on.
     const reducer = makeReducer(5, 'medium', 'twoPlayer', true)
-    const state = reducer(reducer({ phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, bounceCount: 0, bricks: [], lives: 0 }, { type: 'RESET', board }), { type: 'START', random: () => 0.5 })
+    const state = reducer(reducer({ phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, server: null, bounceCount: 0, bricks: [], lives: 0 }, { type: 'RESET', board }), { type: 'START', random: () => 0.5 })
     const maxSpeed = BALL_SPEED_TIERS.medium.max
     // A single brick, mid-court and clear of both paddles - isolates brick-tunneling safety from
     // paddle collision entirely, same discipline as the paddle tunneling test above.
@@ -230,7 +230,7 @@ describe('TICK substep loop - brick tunneling regression', () => {
 
 describe('solo/Brickbreaker', () => {
   function soloIdleState(): GameState {
-    return makeReducer(5, 'medium', 'solo', false)({ phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, bounceCount: 0, bricks: [], lives: 0 }, { type: 'RESET', board })
+    return makeReducer(5, 'medium', 'solo', false)({ phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, server: null, bounceCount: 0, bricks: [], lives: 0 }, { type: 'RESET', board })
   }
 
   function soloLiveState(random: () => number = () => 0.5): GameState {
@@ -251,7 +251,7 @@ describe('solo/Brickbreaker', () => {
     expect(state.ball.vx).toBeGreaterThan(0)
   })
 
-  it('a miss decrements lives and transitions to pointScored while lives remain, with lastScoredBy fixed at 1', () => {
+  it("a miss decrements lives and transitions to pointScored while lives remain, the next ball back on player 1's paddle", () => {
     const reducer = makeReducer(5, 'medium', 'solo', false)
     const state = soloLiveState()
     const clearOfPaddle1 = board.paddleX[1] - board.paddleWidth / 2 - board.ballRadius - 5
@@ -259,9 +259,10 @@ describe('solo/Brickbreaker', () => {
     const after = reducer({ ...state, ball: { x: clearOfPaddle1, y: board.centerY, vx: -30, vy: 0, speed: 30 } }, { type: 'TICK', board, dt: 1, targets })
     expect(after.lives).toBe(SOLO_LIVES - 1)
     expect(after.phase).toBe('pointScored')
-    // Not "who scored" (solo has no opponent) - fixed at 1 so POINT_SERVE's otherPlayer(lastScoredBy)
-    // still resolves to 2, correctly re-serving away from the player and into the field.
-    expect(after.lastScoredBy).toBe(1)
+    expect(after.server).toBe(1)
+    expect(after.ball.x).toBeCloseTo(servingBall(board, after.paddles, 1).x, 5)
+    const served = reducer(after, { type: 'POINT_SERVE', board, random: () => 0.9 })
+    expect(served.ball.vx).toBeGreaterThan(0) // into the field, away from the player
   })
 
   it('exhausting lives ends the round as a loss', () => {
@@ -297,5 +298,73 @@ describe('solo/Brickbreaker', () => {
     expect(after.ball.vx).toBeLessThan(0) // bounced back leftward off the far wall
     expect(after.ball.speed).toBeCloseTo(30, 5) // unchanged - a paddle hit would have ratcheted this up
     expect(after.phase).toBe('live')
+  })
+})
+
+// Breaker serves from a paddle, as the classic does (Jay, 2026-11-07: the ball starting in the middle
+// was weird, and head to head the middle is the band of bricks). Paddles still serves from the middle.
+describe("Breaker's serve from a paddle", () => {
+  const reducer = makeReducer(5, 'medium', 'vsCpu', true)
+  function breakerIdle(): GameState {
+    return reducer({ phase: 'idle', scores: [0, 0], ball: { x: 0, y: 0, vx: 0, vy: 0, speed: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredBy: null, server: null, bounceCount: 0, bricks: [], lives: 0 }, { type: 'RESET', board })
+  }
+
+  it("starts with the ball resting on player 1's paddle, clear of the bricks, and serves it from there toward player 2", () => {
+    const idle = breakerIdle()
+    expect(idle.server).toBe(1)
+    expect(idle.ball).toMatchObject({ ...servingBall(board, idle.paddles, 1), vx: 0, vy: 0, speed: 0 })
+    const field = buildSharedBrickField(board)
+    expect(idle.ball.x + board.ballRadius).toBeLessThan(Math.min(...field.map((b) => b.x)))
+    // random 0.9 would be a serve toward player 1 from the middle (a coin flip): from the paddle it's always away.
+    const started = reducer(idle, { type: 'START', random: () => 0.9 })
+    expect(started.phase).toBe('live')
+    expect(started.ball.vx).toBeGreaterThan(0)
+    expect(started.ball.x).toBe(idle.ball.x)
+  })
+
+  it('the ball rides along with the paddle while the serve waits, and the paddles follow their players', () => {
+    const idle = breakerIdle()
+    const targets = { 1: board.paddleMinY + 20, 2: board.paddleMaxY - 20 }
+    const next = reducer(idle, { type: 'TICK', board, dt: 1, targets })
+    expect(next.phase).toBe('idle')
+    expect(next.paddles[1].y).toBeCloseTo(targets[1], 5)
+    expect(next.paddles[2].y).toBeCloseTo(targets[2], 5)
+    expect(next.ball).toMatchObject({ ...servingBall(board, next.paddles, 1), vx: 0, vy: 0 })
+  })
+
+  it("the player who lost the ball serves the next one from their paddle, which isn't re-centered", () => {
+    const live = reducer(breakerIdle(), { type: 'START', random: () => 0.5 })
+    const clearOfPaddle2 = board.paddleX[2] + board.paddleWidth / 2 + board.ballRadius + 5
+    const targets = { 1: board.paddleMinY + 20, 2: board.paddleMaxY - 20 }
+    const afterPoint = reducer({ ...live, ball: { x: clearOfPaddle2, y: board.centerY, vx: 30, vy: 0, speed: 30 } }, { type: 'TICK', board, dt: 1, targets })
+    expect(afterPoint.phase).toBe('pointScored')
+    expect(afterPoint.scores).toEqual([1, 0])
+    expect(afterPoint.server).toBe(2)
+    expect(afterPoint.ball.x).toBeCloseTo(servingBall(board, afterPoint.paddles, 2).x, 5)
+    expect(afterPoint.ball.y).toBeCloseTo(afterPoint.paddles[2].y, 5)
+
+    const served = reducer(afterPoint, { type: 'POINT_SERVE', board, random: () => 0.1 })
+    expect(served.phase).toBe('live')
+    expect(served.ball.vx).toBeLessThan(0) // away from player 2, toward player 1
+    expect(served.ball.speed).toBe(BALL_SPEED_TIERS.medium.base)
+    expect(served.paddles).toEqual(afterPoint.paddles)
+  })
+
+  it('a resize lays the bricks out again for the new court, each still broken or not, and keeps a waiting ball on its paddle', () => {
+    const idle = breakerIdle()
+    const broken = { ...idle, bricks: idle.bricks.map((b, i) => ({ ...b, destroyed: i % 3 === 0 })) }
+    const wide = computeBoardLayout(1200, 400, insets, 'medium')
+    const next = reducer(broken, { type: 'RESCALE', prevBoard: board, board: wide })
+    const fresh = buildSharedBrickField(wide)
+    expect(next.bricks.map((b) => ({ ...b, destroyed: false }))).toEqual(fresh)
+    expect(next.bricks.map((b) => b.destroyed)).toEqual(broken.bricks.map((b) => b.destroyed))
+    expect(next.ball).toMatchObject(servingBall(wide, next.paddles, 1))
+  })
+
+  it("Paddles keeps Pong's serve from the middle", () => {
+    const idle = idleState()
+    expect(idle.server).toBeNull()
+    expect(idle.ball.x).toBeCloseTo(board.centerX, 5)
+    expect(idle.ball.y).toBeCloseTo(board.centerY, 5)
   })
 })

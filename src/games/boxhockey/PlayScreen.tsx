@@ -3,9 +3,9 @@ import { callWorkletCallback, useKeepAwake, useWorkletCallback } from '@rific/co
 import { Button, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
-import { useBackgroundPause, useOrientationState, useSettledWindowDimensions } from '@tastic/core'
+import { useBackgroundPause, useSettledWindowDimensions } from '@tastic/core'
 import { ConfirmDialog, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
+import { liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useProfiles } from '@tastic/shell'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -231,8 +231,12 @@ export default function GameScreen() {
   // On a phone (native or mobile web), the device's own physical edges already read as "the
   // wall" - no drawn perimeter needed. Desktop web has no such edge (the board just floats in an
   // arbitrarily-sized browser window), so it's the one place Board.tsx still draws the perimeter
-  // walls (see showWalls below).
-  const isDesktopWeb = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
+  // walls (see showWalls below). The board's desktop shape: mirrors utils/board.ts's
+  // isDesktopLayout, so it's the window's width, not whether this is a computer.
+  const desktopBoard = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
+  // A computer (the shell's useAtComputer: the web without a touch-first screen, at any width): it
+  // has a keyboard (the faceoff's key hints) and its two players sit side by side (MatchOverlays).
+  const atComputer = useAtComputer()
 
   // ─── Auto-advance from 'scored' ───────────────────────────────────────────
   // Also held while paused (settings or quit-confirm dialog up) - otherwise this timer keeps
@@ -842,7 +846,7 @@ export default function GameScreen() {
       <View style={[styles.boardArea, { marginTop: boardAreaMarginTop }]}>
         <GestureDetector gesture={panGesture.enabled(gestureEnabled)}>
           <View style={styles.boardAreaTouchable}>
-            <Board board={board} puck={puck} aim={displayAim} phase={phase} currentPlayer={currentPlayer} aimingPlayer={aimingPlayer} isIntercepting={isIntercepting} puckInterceptable={puckInterceptable} lastScoredGoal={lastScoredGoal} scores={scores} scoreToWin={scoreToWin} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} faceoff={faceoff} tripleTap={tripleTap} controlScheme={controlScheme[aimingPlayer]} coinFlipStarted={coinFlipStarted} showWalls={isDesktopWeb} previewLengthPx={shotPreviewLengthPx} shotPreviewLength={roundSettings.shotPreviewLength} friction={friction} />
+            <Board board={board} puck={puck} aim={displayAim} phase={phase} currentPlayer={currentPlayer} aimingPlayer={aimingPlayer} isIntercepting={isIntercepting} puckInterceptable={puckInterceptable} lastScoredGoal={lastScoredGoal} scores={scores} scoreToWin={scoreToWin} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} faceoff={faceoff} tripleTap={tripleTap} controlScheme={controlScheme[aimingPlayer]} coinFlipStarted={coinFlipStarted} showWalls={desktopBoard} previewLengthPx={shotPreviewLengthPx} shotPreviewLength={roundSettings.shotPreviewLength} friction={friction} />
           </View>
         </GestureDetector>
 
@@ -886,9 +890,9 @@ export default function GameScreen() {
           <View style={StyleSheet.absoluteFill} pointerEvents={coinFlipAwaitingTap ? 'auto' : 'none'} />
         </GestureDetector>
 
-        {/* Key hints (desktop web only) - see FACEOFF_KEY_HINTS above for why desktop needs a
+        {/* Key hints (at a computer only) - see FACEOFF_KEY_HINTS above for why desktop needs a
             keyboard path at all: a shared mouse can't do a two-person tap race. Gated on
-            isDesktopWeb, not bare `Platform.OS === 'web'` - mobile web is still `Platform.OS ===
+            atComputer, not bare `Platform.OS === 'web'` - mobile web is still `Platform.OS ===
             'web'` but has touch, not a keyboard, so showing key labels there is just wrong/
             confusing chrome over what's actually a tap input (the p1TapGesture/p2TapGesture zones
             above already work there identically to native). Positioned at the same board-local
@@ -900,7 +904,7 @@ export default function GameScreen() {
             tailored to whatever color the player actually picked in loadout, rather than reaching
             for a generic contrast-computation helper - a fixed white label would wash out against
             a light player color like yellow. */}
-        {isDesktopWeb &&
+        {atComputer &&
           phase === 'faceoff' &&
           FACEOFF_KEY_HINTS.map((h) => {
             const c = faceoffZoneCenter(board, h.player, h.zoneIndex)
@@ -913,7 +917,7 @@ export default function GameScreen() {
       </View>
 
       {/* Back + settings chips live in MatchOverlays below, beside its dialogs (see its own comment). */}
-      <MatchOverlays phase={phase} scores={scores} winner={winner} loser={loser} playerColor={playerColor} playerOnColor={playerOnColor} twoPlayer={aiPlayer === null} onResetGame={() => resetGame(board)} confirmVisible={confirmVisible} cancelBack={cancelBack} settingsOpen={settingsOpen} onSettingsDismiss={() => setSettingsOpen(false)} onSettingsOpen={() => setSettingsOpen(true)} board={board} boardAreaMarginTop={boardAreaMarginTop} desktopWeb={isDesktopWeb} onBackPress={requestBack} backgroundPaused={backgroundPaused} onResume={resume} />
+      <MatchOverlays phase={phase} scores={scores} winner={winner} loser={loser} playerColor={playerColor} playerOnColor={playerOnColor} twoPlayer={aiPlayer === null} onResetGame={() => resetGame(board)} confirmVisible={confirmVisible} cancelBack={cancelBack} settingsOpen={settingsOpen} onSettingsDismiss={() => setSettingsOpen(false)} onSettingsOpen={() => setSettingsOpen(true)} board={board} boardAreaMarginTop={boardAreaMarginTop} atComputer={atComputer} onBackPress={requestBack} backgroundPaused={backgroundPaused} onResume={resume} />
     </View>
   )
 }
@@ -941,24 +945,21 @@ interface MatchOverlaysProps {
   board: BoardLayout
   // GameScreen's own real physical Y-offset of boardArea (see its own doc comment there).
   boardAreaMarginTop: number
-  // GameScreen's isDesktopWeb: where 2 Player's toasts and cards go (the chips read it themselves).
-  desktopWeb: boolean
+  // GameScreen's atComputer: where 2 Player's toasts and cards go (the chips read it themselves).
+  atComputer: boolean
   onBackPress: () => void
   // GameScreen's useBackgroundPause latch and its resume, for the Paused dialog below.
   backgroundPaused: boolean
   onResume: () => void
 }
 
-// Kept as its own sibling of the board/gesture tree above, so its one live read (the window's
-// shape, for where 2 Player's toasts go) never re-renders the board - mirrors LightCycles'
+// Kept as its own sibling of the board/gesture tree above, so the board never re-renders for it - mirrors LightCycles'
 // identically-shaped MatchOverlays. The board is permanently 'faceToFace' (see GameScreen's own
 // comment above) and never turns, and nothing here turns for the device's hold either: the only turn
 // left is player 2's 180 on their own Game Over card and toasts (seatToastSpots).
-function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColor, twoPlayer, onResetGame, confirmVisible, cancelBack, settingsOpen, onSettingsDismiss, onSettingsOpen, board, boardAreaMarginTop, desktopWeb, onBackPress, backgroundPaused, onResume }: MatchOverlaysProps) {
-  // The window's shape, for where 2 Player's unlock toasts go (seatToastSpots).
-  const { orientationMode: windowMode } = useOrientationState()
+function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColor, twoPlayer, onResetGame, confirmVisible, cancelBack, settingsOpen, onSettingsDismiss, onSettingsOpen, board, boardAreaMarginTop, atComputer, onBackPress, backgroundPaused, onResume }: MatchOverlaysProps) {
   // Each seat's half and reading angle, shared by 2 Player's Game Over cards and unlock toasts.
-  const seatSpots = seatToastSpots(windowMode, desktopWeb)
+  const seatSpots = seatToastSpots(atComputer)
   // The Game Over card and the dialogs' score lines sit on @tastic/hud's OverlayCard, so their text
   // takes its theme colors rather than this screen's literal black/white.
   // Quit's outlined label is cardFg, the card's own text color, not Paper's default (the theme's

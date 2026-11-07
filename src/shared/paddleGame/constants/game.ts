@@ -41,10 +41,14 @@ export const PADDLE_COLLISION_RESTITUTION = 1
 // as a legitimate rally.
 export const PADDLE_STEER_FACTOR = 0.6
 
+// Each paddle hit adds `increment` to the ball's speed, up to `max`. Jay (2026-11-07): the ramp was
+// "WAY too fast": at 1.0/1.4/1.8 a hit, a ball reached its top speed (about 2.5 times its serve) after
+// 8 or 9 hits, 4 or 5 each. At about a third of that it takes 23 or 24 hits, a dozen each, so a rally
+// builds slowly and only a long one gets really fast. First guesses, for Jay to judge by feel.
 export const BALL_SPEED_TIERS: Record<BallSpeedLevel, { base: number; increment: number; max: number }> = {
-  slow: { base: 6, increment: 1.0, max: 14 },
-  medium: { base: 8, increment: 1.4, max: 20 },
-  fast: { base: 11, increment: 1.8, max: 26 }
+  slow: { base: 6, increment: 0.35, max: 14 },
+  medium: { base: 8, increment: 0.5, max: 20 },
+  fast: { base: 11, increment: 0.65, max: 26 }
 }
 
 export const SCORE_TO_WIN = 5
@@ -60,20 +64,29 @@ export const SERVE_ANGLE_MAX_DEG = 30
 export const PADDLE_TUNNEL_SAFETY_RATIO = 0.4
 export const MAX_TICK_SUBSTEPS = 8
 
-// Brick field sizing - all fractions of board height/width, same idiom as the ratios above. Solo's
-// field fills most of the court (runway near paddle 1, margin before the far wall); the shared
-// vsCpu/twoPlayer field is a narrower block centered on the court so it can never overlap either
-// paddle's reachable area, since a paddle only ever moves in Y at a fixed X.
-export const BRICK_GAP_RATIO = 0.006 // of board.height, applied to both axes
-export const SOLO_BRICK_COLS = 6
-export const SOLO_BRICK_ROWS = 8
-export const SOLO_BRICK_FIELD_X_START_RATIO = 0.3
-export const SOLO_BRICK_FIELD_X_END_RATIO = 0.92
-export const SOLO_BRICK_FIELD_Y_MARGIN_RATIO = 0.06
-export const SHARED_BRICK_COLS = 3
-export const SHARED_BRICK_ROWS = 8
-export const SHARED_BRICK_FIELD_WIDTH_RATIO = 0.24 // total width, centered on board.centerX
+// Breaker's bricks, in the classic brick breaker's shape (Jay, 2026-11-07: they were huge): wide
+// across the court, along the paddle's travel, and thin along the court's length, where the puck
+// travels. Both sizes are fractions of the court's width across (board.height), so a brick keeps its
+// shape on every screen: about 47 x 15pt on a phone. They were a 6 x 8 grid filling 62% of the court's
+// length, each about 41pt across and 77pt deep on a phone, taller than wide. The counts stay 48 alone
+// and 24 head to head.
+export const BRICK_GAP_RATIO = 0.006 // of board.height, between neighboring bricks both ways
+export const BRICK_DEPTH_RATIO = 0.045 // a row's depth along the court's length, gap included
+// Alone: rows wall to wall across the court, as the classic's are, near the far wall with three rows'
+// worth of empty court beyond them for a puck that breaks through.
+export const SOLO_BRICK_ROWS = 6
+export const SOLO_BRICKS_PER_ROW = 8
+export const SOLO_BRICK_FAR_GAP_ROWS = 3
+// Head to head: a thin band across the middle, short of each side wall so a puck can still get by
+// along the wall, and so each score fits between the wall and the band (see the play screen).
+export const SHARED_BRICK_ROWS = 3
+export const SHARED_BRICKS_PER_ROW = 8
 export const SHARED_BRICK_FIELD_Y_MARGIN_RATIO = 0.08
+
+// Breaker serves from a paddle, as the classic does, not from the middle (where the head to head
+// band is): the puck rests this far off the serving paddle's face, in ball radii, and rides along
+// with it until the serve.
+export const SERVE_REST_GAP_RADII = 0.5
 
 // Solo/Brickbreaker only.
 export const SOLO_LIVES = 3

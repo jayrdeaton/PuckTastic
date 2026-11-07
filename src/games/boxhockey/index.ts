@@ -30,7 +30,10 @@ export const boxHockey: GameDefinition = {
   blurb: 'The classic wooden table game. Take turns shooting.',
   icon: GameIcon,
   seatTwo: ['cpu', 'person'],
-  // No sideBySideWhenWide: the board never turns, so 2 Player is face to face in any window.
+  // No sideBySideWhenWide: the board never turns, so on a phone or tablet 2 Player is face to face in
+  // any window. At a computer the players sit side by side, here and on the Game Over cards (the
+  // shell's useAtComputer).
+  sideBySideAtComputer: true,
   reducers: { ...playerSettings.reducers, boxhockeyAchievements: achievements, boxhockeyGuide: guide },
   Provider: GameStatsProvider,
   useLoadout,

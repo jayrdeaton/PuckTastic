@@ -2,8 +2,8 @@ import { useGameLoop } from '@tastic/core'
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import { BALL_SPEED_TIERS, PADDLE_VELOCITY_SMOOTHING_FRAMES, SERVE_PAUSE_MS, SOLO_LIVES } from '@/shared/paddleGame/constants/game'
-import { BallSpeedLevel, BallState, BoardLayout, Brick, GameMode, GameState, PaddleState, Player } from '@/shared/paddleGame/types'
-import { buildSharedBrickField, buildSoloBrickField, centerBall, centerPaddle, clampPaddleY, rescaleBricks } from '@/shared/paddleGame/utils/board'
+import { BallSpeedLevel, BallState, BoardLayout, Brick, GameMode, GameState, PaddleState, PaddleStates, Player } from '@/shared/paddleGame/types'
+import { buildSharedBrickField, buildSoloBrickField, centerBall, centerPaddle, clampPaddleY, servingBall } from '@/shared/paddleGame/utils/board'
 import { bricksActiveFor } from '@/shared/paddleGame/utils/gameMode'
 import { applyBrickCollision, applyPaddleCollision, clampPaddleSpeed, computePaddleVelocity, computeServeVelocity, computeTickSubsteps, stepPhysics } from '@/shared/paddleGame/utils/physics'
 
@@ -18,21 +18,37 @@ type PaddleTargets = Record<Player, number>
 // inject determinism without the live useGameLoop dispatch needing to pass anything explicit.
 type Action = { type: 'TICK'; board: BoardLayout; dt: number; targets: PaddleTargets; random?: () => number } | { type: 'START'; random?: () => number } | { type: 'POINT_SERVE'; board: BoardLayout; random?: () => number } | { type: 'RESET'; board: BoardLayout } | { type: 'RESCALE'; prevBoard: BoardLayout; board: BoardLayout }
 
+// The round's brick field for this board: wall to wall near the far wall alone, a band across the
+// middle head to head, none without bricks.
+function brickField(board: BoardLayout, mode: GameMode, bricksActive: boolean): Brick[] {
+  if (!bricksActive) return []
+  return mode === 'solo' ? buildSoloBrickField(board) : buildSharedBrickField(board)
+}
+
+// Where the ball waits for a serve: on the serving paddle with bricks (see servingBall), in the
+// middle without.
+function restingBall(board: BoardLayout, paddles: PaddleStates, server: Player | null): BallState {
+  return { ...(server === null ? centerBall(board) : servingBall(board, paddles, server)), vx: 0, vy: 0, speed: 0 }
+}
+
 function makeInitialState(board: BoardLayout, mode: GameMode, bricksActive: boolean): GameState {
-  const ballPos = centerBall(board)
   const p1 = centerPaddle(board, 1)
   const p2 = centerPaddle(board, 2)
+  const paddles = { 1: { ...p1, vx: 0, vy: 0 }, 2: { ...p2, vx: 0, vy: 0 } }
+  // With bricks player 1 serves first, from their paddle (in a round alone there's no one else).
+  const server: Player | null = bricksActive ? 1 : null
   return {
     phase: 'idle',
     scores: [0, 0],
     // speed: 0 - unlike AirHockey's puck (which also legitimately sits at rest pre-START), Pong's
     // ball genuinely gets launched by START itself (see the 'START' case below), so a resting
     // speed of 0 here is momentary by design, not a steady state anything else needs to handle.
-    ball: { ...ballPos, vx: 0, vy: 0, speed: 0 },
-    paddles: { 1: { ...p1, vx: 0, vy: 0 }, 2: { ...p2, vx: 0, vy: 0 } },
+    ball: restingBall(board, paddles, server),
+    paddles,
     lastScoredBy: null,
+    server,
     bounceCount: 0,
-    bricks: bricksActive ? (mode === 'solo' ? buildSoloBrickField(board) : buildSharedBrickField(board)) : [],
+    bricks: brickField(board, mode, bricksActive),
     lives: mode === 'solo' ? SOLO_LIVES : 0
   }
 }
@@ -96,13 +112,23 @@ export function makeReducer(scoreToWin: number, ballSpeedLevel: BallSpeedLevel, 
       // has conceded anything yet). Solo has no "neither player" - always serve toward 2 (rightward,
       // away from paddle 1) so the opening serve heads into the brick field rather than sometimes
       // serving straight back at the player.
+      //
+      // With bricks the ball is already resting on the server's paddle (player 1's: see
+      // makeInitialState) and goes from there, away from them.
       case 'START': {
         if (state.phase !== 'idle') return state
-        const velocity = computeServeVelocity(tier.base, isSolo ? 2 : null, action.random)
+        const toward = state.server !== null ? otherPlayer(state.server) : isSolo ? 2 : null
+        const velocity = computeServeVelocity(tier.base, toward, action.random)
         return { ...state, phase: 'live', ball: { ...state.ball, vx: velocity.vx, vy: velocity.vy, speed: tier.base } }
       }
 
       case 'TICK': {
+        // Waiting for a serve from a paddle (bricks only, see useGameState's loop): the paddles
+        // follow their players and the ball rides on the server's, nothing else moves.
+        if ((state.phase === 'idle' || state.phase === 'pointScored') && state.server !== null) {
+          const waiting = { 1: commitPaddle(state.paddles[1], action.targets[1], action.board, 1, action.dt), 2: commitPaddle(state.paddles[2], action.targets[2], action.board, 2, action.dt) }
+          return { ...state, paddles: waiting, ball: restingBall(action.board, waiting, state.server) }
+        }
         if (state.phase !== 'live') return state
 
         const paddles = {
@@ -161,28 +187,29 @@ export function makeReducer(scoreToWin: number, ballSpeedLevel: BallSpeedLevel, 
         }
 
         if (scoredBy !== null) {
-          // At rest, dead center - the actual re-launch happens on the FOLLOWING POINT_SERVE, once
-          // SERVE_PAUSE_MS has given both players a beat to see the score change (see
-          // useGameState's own effect below). speed: 0 here, not tier.base - a scored ball isn't
-          // "in play" again until POINT_SERVE actually serves it.
-          const nextBall: BallState = { ...centerBall(action.board), vx: 0, vy: 0, speed: 0 }
+          // At rest, dead center (or, with bricks, on the paddle of the player who lost the ball:
+          // they serve the next one, as in the classic) - the actual re-launch happens on the
+          // FOLLOWING POINT_SERVE, once SERVE_PAUSE_MS has given both players a beat to see the score
+          // change (see useGameState's own effect below). speed: 0 here, not tier.base - a scored
+          // ball isn't "in play" again until POINT_SERVE actually serves it.
+          const server: Player | null = !bricksActive ? null : isSolo ? 1 : otherPlayer(scoredBy)
+          const nextBall = restingBall(action.board, paddles, server)
 
           if (isSolo) {
             // scoredBy is always 2 in solo (farEdgeIsWall means P2's edge never scores) - i.e. a
-            // miss, not an opponent's point. lastScoredBy stays 1 regardless so POINT_SERVE's
-            // otherPlayer(lastScoredBy) still resolves to 2, correctly serving away from the player
-            // and into the field, with no mode-branching needed inside POINT_SERVE itself.
+            // miss, not an opponent's point. lastScoredBy stays 1 regardless; the next ball is
+            // player 1's to serve, from their paddle into the field (server).
             const lives = state.lives - 1
-            if (lives <= 0) return { ...state, phase: 'gameOver', ball: nextBall, paddles, bricks, lives, lastScoredBy: 1 }
-            return { ...state, phase: 'pointScored', ball: nextBall, paddles, bricks, lives, lastScoredBy: 1 }
+            if (lives <= 0) return { ...state, phase: 'gameOver', ball: nextBall, paddles, bricks, lives, lastScoredBy: 1, server }
+            return { ...state, phase: 'pointScored', ball: nextBall, paddles, bricks, lives, lastScoredBy: 1, server }
           }
 
           const scores: [number, number] = [state.scores[0], state.scores[1]]
           scores[scoredBy - 1]++
           if (scores[scoredBy - 1] >= scoreToWin) {
-            return { ...state, phase: 'gameOver', scores, ball: nextBall, paddles, bricks, lastScoredBy: scoredBy }
+            return { ...state, phase: 'gameOver', scores, ball: nextBall, paddles, bricks, lastScoredBy: scoredBy, server }
           }
-          return { ...state, phase: 'pointScored', scores, ball: nextBall, paddles, bricks, lastScoredBy: scoredBy }
+          return { ...state, phase: 'pointScored', scores, ball: nextBall, paddles, bricks, lastScoredBy: scoredBy, server }
         }
 
         return { ...state, ball, paddles, bricks, bounceCount: anyBounced ? state.bounceCount + 1 : state.bounceCount }
@@ -192,8 +219,15 @@ export function makeReducer(scoreToWin: number, ballSpeedLevel: BallSpeedLevel, 
       // paddles (real Pong re-serves fresh, no possession/turn logic to carry over) and serves the
       // ball toward whoever just conceded (otherPlayer(lastScoredBy) - the scorer doesn't also get
       // to receive their own serve).
+      //
+      // With bricks the server (who lost the last ball) serves it from their paddle, where it has
+      // been riding, away from them; nothing is re-centered, so the paddles stay under their players.
       case 'POINT_SERVE': {
         if (state.phase !== 'pointScored') return state
+        if (state.server !== null) {
+          const velocity = computeServeVelocity(tier.base, otherPlayer(state.server), action.random)
+          return { ...state, phase: 'live', ball: { ...restingBall(action.board, state.paddles, state.server), vx: velocity.vx, vy: velocity.vy, speed: tier.base }, lastScoredBy: null }
+        }
         const p1 = centerPaddle(action.board, 1)
         const p2 = centerPaddle(action.board, 2)
         const velocity = computeServeVelocity(tier.base, otherPlayer(state.lastScoredBy!), action.random)
@@ -209,13 +243,19 @@ export function makeReducer(scoreToWin: number, ballSpeedLevel: BallSpeedLevel, 
       case 'RESET':
         return makeInitialState(action.board, mode, bricksActive)
 
-      case 'RESCALE':
+      // The bricks are laid out again for the new board, each one broken or not as it was: they're
+      // sized off the court's width across, so scaling the old ones would stretch them out of shape
+      // when the court's proportions change. A ball waiting on a paddle stays on it.
+      case 'RESCALE': {
+        const paddles = { 1: rescalePaddleY(state.paddles[1], action.prevBoard, action.board, 1), 2: rescalePaddleY(state.paddles[2], action.prevBoard, action.board, 2) }
+        const waiting = state.server !== null && (state.phase === 'idle' || state.phase === 'pointScored')
         return {
           ...state,
-          ball: rescaleBall(state.ball, action.prevBoard, action.board),
-          paddles: { 1: rescalePaddleY(state.paddles[1], action.prevBoard, action.board, 1), 2: rescalePaddleY(state.paddles[2], action.prevBoard, action.board, 2) },
-          bricks: rescaleBricks(state.bricks, action.prevBoard, action.board)
+          ball: waiting ? restingBall(action.board, paddles, state.server) : rescaleBall(state.ball, action.prevBoard, action.board),
+          paddles,
+          bricks: brickField(action.board, mode, bricksActive).map((b, i) => ({ ...b, destroyed: state.bricks[i]?.destroyed ?? false }))
         }
+      }
 
       default:
         return state
@@ -223,7 +263,11 @@ export function makeReducer(scoreToWin: number, ballSpeedLevel: BallSpeedLevel, 
   }
 }
 
-export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLevel: BallSpeedLevel, mode: GameMode, hasBricks: boolean, paused: boolean) {
+// serveHeld holds the next serve (the opening one and each after a point) where it is, and the serve
+// beat with it, until it turns false: the play screen holds it until every human player is touching
+// the screen (Jay, 2026-11-07: time to back out, and no ball served at nobody). A rally in progress
+// never stops for it.
+export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLevel: BallSpeedLevel, mode: GameMode, hasBricks: boolean, paused: boolean, serveHeld = false) {
   // Mirrored every render so the stable useReducer wrapper below always dispatches through the
   // latest settings-derived reducer, without needing to recreate useReducer itself (which would
   // reset `state` back to its initializer whenever scoreToWin/ballSpeedLevel changed).
@@ -272,7 +316,10 @@ export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLe
     paddleTargetsRef.current = { ...paddleTargetsRef.current, [player]: clamped }
   }, [])
 
-  useGameLoop((dt) => dispatch({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }), { enabled: state.phase === 'live' && !paused, maxDt: 2.5 })
+  // With bricks the loop runs while a serve waits too, so the paddles follow their players and the
+  // ball rides on the server's (see TICK).
+  const waitingOnPaddle = bricksActive && (state.phase === 'idle' || state.phase === 'pointScored')
+  useGameLoop((dt) => dispatch({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }), { enabled: (state.phase === 'live' || waitingOnPaddle) && !paused, maxDt: 2.5 })
 
   // useReducer's lazy init (the `board` argument passed to useReducer above) only ever runs ONCE,
   // at this hook's very first mount - but `board` itself can change again at any later point too:
@@ -313,7 +360,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLe
   // a settings/quit-confirm dialog opened mid-pause doesn't let the ball go live off a stale timer
   // that counted time the dialog was covering the board. Mirrors AirHockey's own identical effect.
   useEffect(() => {
-    if (paused) return undefined
+    if (paused || serveHeld) return undefined
     if (state.phase === 'idle' || state.phase === 'pointScored') {
       const t = setTimeout(() => {
         if (state.phase === 'idle') dispatch({ type: 'START' })
@@ -322,7 +369,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLe
       return () => clearTimeout(t)
     }
     return undefined
-  }, [state.phase, paused])
+  }, [state.phase, paused, serveHeld])
 
   const resetGame = useCallback((currentBoard: BoardLayout) => {
     paddleTargetsRef.current = { 1: centerPaddle(currentBoard, 1).y, 2: centerPaddle(currentBoard, 2).y }

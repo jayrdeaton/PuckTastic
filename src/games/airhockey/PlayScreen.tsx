@@ -5,7 +5,7 @@ import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useProfiles } from '@tastic/shell'
+import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useProfiles } from '@tastic/shell'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
@@ -154,7 +154,7 @@ export default function GameScreen() {
   const paused = settingsOpen || confirmVisible || backgroundPaused
 
   const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
-  const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide } = state
+  const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide, puckInPlay } = state
 
   // Mirrors "an actual live rally, not paused" into liveplay.activelyPlaying for Providers.tsx's
   // EdgeGuardBridge rather than calling useEdgeGestureGuard directly here: it stays mounted once for
@@ -178,11 +178,17 @@ export default function GameScreen() {
 
   useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
 
-  const isDesktopWeb = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
+  // The rink's desktop shape (a fixed ratio with drawn walls, a browser window at least
+  // DESKTOP_WEB_MIN_WIDTH wide): mirrors utils/board.ts's isDesktopLayout, so it's the window's width,
+  // not whether this is a computer.
+  const desktopBoard = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
+  // A computer (the shell's useAtComputer: the web without a touch-first screen, at any width): its
+  // two players sit side by side, so nothing of player 2's is turned to face the far end.
+  const atComputer = useAtComputer()
   // 2 Player: each seat's half of the screen and the angle it reads at, for its Game Over card
   // (SeatResultCards) and its unlock toasts (SeatToasters) alike, so a player's toasts sit where
   // their card does, facing the same way.
-  const seatSpots = seatResultSpots(rotationDeg, isDesktopWeb)
+  const seatSpots = seatResultSpots(rotationDeg, atComputer)
 
   const { dark, colors: themeColors } = useAutoPaperTheme()
   const bg = dark ? '#000000' : '#FFFFFF'
@@ -299,7 +305,7 @@ export default function GameScreen() {
           player 1 (local bottom) on the screen's RIGHT, '-90deg' puts them on the LEFT. */}
       <View style={[styles.viewport, { width, height }]}>
         <View style={[styles.localContainer, { width: localSize.width, height: localSize.height }, rotationDeg !== 0 && { transform: [{ rotate: `${rotationDeg}deg` }] }]}>
-          <Board board={board} puck={puck} paddles={paddles} phase={phase} scores={scores} scoreToWin={scoreToWin} lastScoredGoal={lastScoredGoal} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} showWalls={isDesktopWeb} />
+          <Board board={board} puck={puck} paddles={paddles} phase={phase} scores={scores} scoreToWin={scoreToWin} lastScoredGoal={lastScoredGoal} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} showWalls={desktopBoard} />
           {/* Zones themselves still live inside this same rotated container - DOM/native hit-
               testing needs their rotated screen footprint to correctly decide WHICH zone a touch
               landed on; only the resulting coordinate VALUE (screenToLocal, using
@@ -356,8 +362,10 @@ export default function GameScreen() {
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
       <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
 
-      {/* Back + settings: the shell's MatchChips (see faceToFace above). */}
-      <MatchChips playing={phase === 'live'} faceToFace={faceToFace} centerLineY={centerLineY} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
+      {/* Back + settings: the shell's MatchChips (see faceToFace above). Up until the puck is in play:
+      through every faceoff, until a paddle first strikes the puck (puckInPlay), so there's time to
+      back out or open Settings before play starts. */}
+      <MatchChips playing={phase === 'live' && puckInPlay} faceToFace={faceToFace} centerLineY={centerLineY} onBack={requestBack} onSettings={() => setSettingsOpen(true)} />
 
       <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />
     </View>

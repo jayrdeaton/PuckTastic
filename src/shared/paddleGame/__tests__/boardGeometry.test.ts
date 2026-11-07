@@ -1,6 +1,6 @@
-import { PADDLE_HEIGHT_RATIOS, SHARED_BRICK_COLS, SHARED_BRICK_ROWS, SOLO_BRICK_COLS, SOLO_BRICK_ROWS, TABLE_WIDTH_TO_HEIGHT_RATIO } from '@/shared/paddleGame/constants/game'
+import { BRICK_DEPTH_RATIO, PADDLE_HEIGHT_RATIOS, SHARED_BRICK_FIELD_Y_MARGIN_RATIO, SHARED_BRICK_ROWS, SHARED_BRICKS_PER_ROW, SOLO_BRICK_FAR_GAP_ROWS, SOLO_BRICK_ROWS, SOLO_BRICKS_PER_ROW, TABLE_WIDTH_TO_HEIGHT_RATIO } from '@/shared/paddleGame/constants/game'
 import { Brick, PaddleSizeLevel } from '@/shared/paddleGame/types'
-import { buildSharedBrickField, buildSoloBrickField, centerBall, centerPaddle, clampPaddleY, computeBoardLayout, rescaleBricks } from '@/shared/paddleGame/utils/board'
+import { buildSharedBrickField, buildSoloBrickField, centerBall, centerPaddle, clampPaddleY, computeBoardLayout, servingBall } from '@/shared/paddleGame/utils/board'
 
 const insets = { top: 0, bottom: 0, left: 0, right: 0 }
 const sizes: PaddleSizeLevel[] = ['small', 'medium', 'large']
@@ -105,12 +105,16 @@ describe('centerBall / centerPaddle / clampPaddleY', () => {
   })
 })
 
+// An iPhone 15's court, turned: its length is the screen's height inside the safe areas, its width
+// across the screen's width.
+const phone = computeBoardLayout(852 - 59 - 34, 393, insets, 'medium')
+
 describe('buildSoloBrickField', () => {
   const board = computeBoardLayout(900, 400, insets, 'medium')
   const bricks = buildSoloBrickField(board)
 
-  it('produces exactly SOLO_BRICK_COLS * SOLO_BRICK_ROWS bricks', () => {
-    expect(bricks).toHaveLength(SOLO_BRICK_COLS * SOLO_BRICK_ROWS)
+  it('produces exactly SOLO_BRICK_ROWS * SOLO_BRICKS_PER_ROW bricks', () => {
+    expect(bricks).toHaveLength(SOLO_BRICK_ROWS * SOLO_BRICKS_PER_ROW)
   })
 
   it('every brick starts undestroyed and fully within the board rect', () => {
@@ -122,14 +126,34 @@ describe('buildSoloBrickField', () => {
     const positions = new Set(bricks.map((b) => `${b.x},${b.y}`))
     expect(positions.size).toBe(bricks.length)
   })
+
+  // Jay (2026-11-07): the bricks were huge, taller than wide on a phone.
+  it("is the classic's shape on a phone: bricks about 47pt across and 15pt deep, three times as wide as deep", () => {
+    for (const b of buildSoloBrickField(phone)) {
+      expect(b.height).toBeCloseTo(46.8, 0)
+      expect(b.width).toBeCloseTo(15.3, 0)
+    }
+  })
+
+  it('runs wall to wall across the court, rows stacked toward the far wall with three rows of empty court beyond them', () => {
+    const field = buildSoloBrickField(phone)
+    const depth = phone.height * BRICK_DEPTH_RATIO
+    expect(Math.min(...field.map((b) => b.y))).toBeLessThan(phone.y + 2)
+    expect(Math.max(...field.map((b) => b.y + b.height))).toBeGreaterThan(phone.y + phone.height - 2)
+    const farEdge = Math.max(...field.map((b) => b.x + b.width))
+    expect(phone.x + phone.width - farEdge).toBeGreaterThan(depth * SOLO_BRICK_FAR_GAP_ROWS)
+    expect(phone.x + phone.width - farEdge).toBeLessThan(depth * (SOLO_BRICK_FAR_GAP_ROWS + 1))
+    // Most of the court, from player 1's paddle on, is open runway.
+    expect(Math.min(...field.map((b) => b.x)) - phone.x).toBeGreaterThan(phone.width * 0.7)
+  })
 })
 
 describe('buildSharedBrickField', () => {
   const board = computeBoardLayout(900, 400, insets, 'medium')
   const bricks = buildSharedBrickField(board)
 
-  it('produces exactly SHARED_BRICK_COLS * SHARED_BRICK_ROWS bricks, fewer than the solo field', () => {
-    expect(bricks).toHaveLength(SHARED_BRICK_COLS * SHARED_BRICK_ROWS)
+  it('produces exactly SHARED_BRICK_ROWS * SHARED_BRICKS_PER_ROW bricks, fewer than the solo field', () => {
+    expect(bricks).toHaveLength(SHARED_BRICK_ROWS * SHARED_BRICKS_PER_ROW)
     expect(bricks.length).toBeLessThan(buildSoloBrickField(board).length)
   })
 
@@ -144,28 +168,33 @@ describe('buildSharedBrickField', () => {
     const p2Left = board.paddleX[2] - halfW
     expect(bricks.every((b) => b.x >= p1Right && b.x + b.width <= p2Left)).toBe(true)
   })
+
+  it('is a thin band across the middle, its bricks the same shape as alone, short of each side wall where the scores sit', () => {
+    const field = buildSharedBrickField(phone)
+    const near = Math.min(...field.map((b) => b.x))
+    const far = Math.max(...field.map((b) => b.x + b.width))
+    expect((near + far) / 2).toBeCloseTo(phone.centerX, 5)
+    expect(far - near).toBeLessThan(phone.height * BRICK_DEPTH_RATIO * SHARED_BRICK_ROWS)
+    expect(Math.min(...field.map((b) => b.y)) - phone.y).toBeGreaterThan(phone.height * SHARED_BRICK_FIELD_Y_MARGIN_RATIO)
+    expect(phone.y + phone.height - Math.max(...field.map((b) => b.y + b.height))).toBeGreaterThan(phone.height * SHARED_BRICK_FIELD_Y_MARGIN_RATIO)
+    for (const b of field) {
+      expect(b.width).toBeCloseTo(15.3, 0)
+      expect(b.height).toBeGreaterThan(b.width * 2)
+    }
+  })
 })
 
-describe('rescaleBricks', () => {
-  const board = computeBoardLayout(900, 400, insets, 'medium')
+describe('servingBall', () => {
+  const paddles = { 1: { x: phone.paddleX[1], y: phone.paddleMinY + 10, vx: 0, vy: 0 }, 2: { x: phone.paddleX[2], y: phone.paddleMaxY - 10, vx: 0, vy: 0 } }
 
-  it('remaps position and size fractionally, and carries destroyed state straight through', () => {
-    const bricks = buildSoloBrickField(board).map((b, i) => ({ ...b, destroyed: i === 0 }))
-    const doubled = computeBoardLayout(1800, 800, insets, 'medium')
-    const rescaled = rescaleBricks(bricks, board, doubled)
-
-    expect(rescaled).toHaveLength(bricks.length)
-    expect(rescaled[0].destroyed).toBe(true)
-    expect(rescaled.slice(1).every((b) => !b.destroyed)).toBe(true)
-    // Doubling the board should double each brick's size along with its position.
-    expect(rescaled[1].width).toBeCloseTo(bricks[1].width * (doubled.width / board.width), 5)
-    expect(rescaled[1].height).toBeCloseTo(bricks[1].height * (doubled.height / board.height), 5)
-  })
-
-  it('falls back to a stable (non-NaN) result when rescaling from a degenerate zero-sized board', () => {
-    const bricks = buildSoloBrickField(board)
-    const zeroBoard = computeBoardLayout(0, 0, insets, 'medium')
-    const rescaled = rescaleBricks(bricks, zeroBoard, board)
-    expect(rescaled.every((b) => !Number.isNaN(b.x) && !Number.isNaN(b.y) && !Number.isNaN(b.width) && !Number.isNaN(b.height))).toBe(true)
+  it("rests just off the serving paddle's face, on the court side, level with its middle", () => {
+    const one = servingBall(phone, paddles, 1)
+    const two = servingBall(phone, paddles, 2)
+    expect(one.y).toBe(paddles[1].y)
+    expect(two.y).toBe(paddles[2].y)
+    const clear = phone.paddleWidth / 2 + phone.ballRadius
+    expect(one.x - phone.paddleX[1]).toBeGreaterThan(clear)
+    expect(one.x - phone.paddleX[1]).toBeLessThan(clear + phone.ballRadius)
+    expect(phone.paddleX[2] - two.x).toBeCloseTo(one.x - phone.paddleX[1], 5)
   })
 })

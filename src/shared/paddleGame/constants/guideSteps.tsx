@@ -97,7 +97,7 @@ export function getGuideSteps({ touch, controls, scoreToWin, hasBricks }: GuideS
     ? [
         {
           title: 'Play Alone',
-          body: `Pick Nobody for player 2, then clear every brick before your ${SOLO_LIVES} lives run out.`,
+          body: `Pick Solo, then clear every brick before your ${SOLO_LIVES} lives run out.`,
           art: <GuideBrickField alone />
         }
       ]
