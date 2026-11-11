@@ -1,7 +1,7 @@
 {
   "configVersion": 0,
   "apple": {
-    "version": "1.1.1",
+    "version": "2.0.0",
     "copyright": "2026 Infinite Token LLC",
     "categories": [
       [
@@ -15,51 +15,27 @@
         "title": "PuckTastic",
         "subtitle": "Four Puck Games. No Ads.",
         "promoText": "Box Hockey, Air Hockey, Paddles and Breaker in one app. Play a friend across the table or the CPU, with no ads and no tracking.",
-        "description": "Four tabletop puck games in one app: Box Hockey, Air Hockey, Paddles and Breaker. Play a friend face to face on one device, or the CPU. No ads, no accounts.\n\n• Box Hockey: the classic wooden table game. Take turns shooting the puck through the gaps and into their goal. Three tip-offs (a Face-Off reaction race, a Coin Flip, or Triple Tap), three boards (Classic, Gauntlet, and Gravity), a Rink option, and four ways to shoot\n• Air Hockey: the arcade table classic. Guard your goal and fire back, both players at once\n• Paddles: the arcade original. Get the puck past their paddle\n• Breaker: the classic brick breaker. Clear every brick on your own, or play head to head with bricks in the middle\n• Two Player face to face on one device, or One Player against the CPU (Easy, Medium, or Hard)\n• Set each game's score to win, puck speed, and more\n• Player profiles, stats, and 138 achievements across the four games\n• Plays offline\n\nPart of the Tastic family of games. Your player profiles are shared with the other Tastic games on your device.\n\nOpen source on GitHub: https://github.com/jayrdeaton/BoxHockey",
+        "description": "Four tabletop puck games in one app: Box Hockey, Air Hockey, Paddles and Breaker. Play a friend face to face on one device, or the CPU. No ads, no accounts.\n\n• Box Hockey: the classic wooden table game. Take turns shooting the puck through the gaps and into their goal. Three tip-offs (a Face-Off reaction race, a Coin Flip, or Triple Tap), three boards (Classic, Gauntlet, and Gravity), a Rink option, and four ways to shoot\n• Air Hockey: the arcade table classic. Guard your goal and fire back, both players at once\n• Paddles: the arcade original. Get the puck past their paddle\n• Breaker: the classic brick breaker. Clear every brick on your own, or play head to head with bricks in the middle\n• Two players face to face on one device, or one against the CPU (Easy, Medium, or Hard)\n• Tilt Control: in Paddles and Breaker, tilt your iPhone or iPad to steer when you're the only player\n• Set each game's score to win, puck speed, and more\n• Player profiles, stats, and 138 achievements across the four games\n• Plays offline\n\nPart of the Tastic family of games. Your player profiles are shared with the other Tastic games on your device.\n\nOpen source on GitHub: https://github.com/jayrdeaton/PuckTastic",
         "keywords": [
-          "air hockey",
-          "box hockey",
-          "puck",
+          "hockey",
+          "air",
+          "box",
           "paddle",
-          "bricks",
-          "table",
+          "brick",
+          "breaker",
+          "tabletop",
           "arcade",
           "two player",
           "versus",
           "pass and play",
-          "offline"
+          "offline",
+          "local"
         ],
+        "releaseNotes": "BoxHockeyTastic is now PuckTastic: four puck games in one app.\n\n• Air Hockey: the arcade table classic. Guard your goal and fire back, both players at once\n• Paddles: the arcade original. Get the puck past their paddle\n• Breaker: the classic brick breaker, on your own or head to head\n• Pick your opponent in each game: the CPU at Easy, Medium, or Hard, or a friend across the table\n• Stats and achievements for every game, 138 in all\n• Your players, Box Hockey settings, stats, and achievements come with you",
         "marketingUrl": "https://games.infinitetoken.com/pucktastic",
         "supportUrl": "https://games.infinitetoken.com/support",
         "privacyPolicyUrl": "https://games.infinitetoken.com/privacy"
       }
-    },
-    "advisory": {
-      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
-      "contests": "NONE",
-      "gamblingSimulated": "NONE",
-      "gunsOrOtherWeapons": "NONE",
-      "horrorOrFearThemes": "NONE",
-      "matureOrSuggestiveThemes": "NONE",
-      "medicalOrTreatmentInformation": "NONE",
-      "profanityOrCrudeHumor": "NONE",
-      "sexualContentGraphicAndNudity": "NONE",
-      "sexualContentOrNudity": "NONE",
-      "violenceCartoonOrFantasy": "NONE",
-      "violenceRealistic": "NONE",
-      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
-      "advertising": false,
-      "ageAssurance": false,
-      "gambling": false,
-      "healthOrWellnessTopics": false,
-      "lootBox": false,
-      "messagingAndChat": false,
-      "parentalControls": false,
-      "unrestrictedWebAccess": false,
-      "userGeneratedContent": false,
-      "kidsAgeBand": null,
-      "ageRatingOverride": "NONE",
-      "koreaAgeRatingOverride": "NONE"
     }
   }
 }

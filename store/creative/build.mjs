@@ -1,16 +1,17 @@
-// The App Store's product page header and search results art (iOS 27's creative assets, see store/README.md), drawn
-// from the app's own board, never a lookalike. Board.tsx draws with Skia, which doesn't render outside the app (it
+// The App Store's product page header and search results art (iOS 27's creative assets, see store/README.md), and
+// Google Play's feature graphic (store/google-play.md), drawn from the app's own board, never a lookalike. Board.tsx draws with Skia, which doesn't render outside the app (it
 // needs CanvasKit, Reanimated and the theme provider), so the header redraws Board's own shapes as SVG from the app's
 // real geometry and colors: computeBoardLayout on the iPhone 17 Pro Max layout (the screenshots' device), Classic,
 // medium puck, Rink off, faceoffZoneCenters/faceoffZoneRadius for the circles, computeGoalWedges for the score arcs,
-// and the dark theme's colors (the shell's DEFAULT_SEAT_COLORS, Board's white walls and 25% white lines). The puck's
-// flight is a real shot played out frame by frame on the app's own stepPhysics. The search art's phone shows the
-// in-play screenshot capture (store/screenshots/raw/iphone/01-play.png, so take the screenshots first).
+// and the dark theme's colors (the pack's seatColors from src/pack.ts, Board's white walls and 25% white lines). The
+// puck's flight is a real shot played out frame by frame on the app's own stepPhysics. The search art's phone shows
+// Home's screenshot capture, the four games (store/screenshots/raw/iphone/02-home.png, so take the screenshots first).
 //
 //   node store/creative/build.mjs
 //
-// Writes store/screenshots/header.png (3840 x 1646) and store/screenshots/search.png (3840 x 2560), each with -safe
-// and -384 previews, through the app-store-prep skill's creative.mjs (CREATIVE=/path/to/creative.mjs to override).
+// Writes store/screenshots/header.png (3840 x 1646), store/screenshots/search.png (3840 x 2560) and
+// store/screenshots/google-play/feature-graphic.png (1024 x 500), each with -safe and -384 previews, through the
+// app-store-prep skill's creative.mjs (CREATIVE=/path/to/creative.mjs to override).
 // Same bundling as store/seed/generate.mjs: esbuild with a react-native Platform stub.
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -25,7 +26,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(HERE, '../..')
 const OUT_DIR = path.join(ROOT, 'store', 'screenshots')
 const CREATIVE = process.env.CREATIVE ?? path.join(os.homedir(), '.claude/skills/app-store-prep/scripts/creative.mjs')
-const CAPTURE = path.join(OUT_DIR, 'raw', 'iphone', '01-play.png')
+const CAPTURE = path.join(OUT_DIR, 'raw', 'iphone', '02-home.png')
 // The screenshots' caption font (store/screenshots.json), the closest file to the app's Menlo.
 const FONT = '/System/Library/Fonts/SFNSMono.ttf'
 
@@ -34,8 +35,13 @@ export { computeBoardLayout, faceoffZoneCenters, faceoffZoneRadius } from '@/gam
 export { stepPhysics } from '@/games/boxhockey/utils/physics'
 export { computeGoalWedges } from '@tastic/physics'
 export { FRICTION_LEVELS, GOAL_LINE_STROKE_WIDTH, MAX_SPEED } from '@/games/boxhockey/constants/game'
-export { DEFAULT_SEAT_COLORS } from '@/shell/seatColors'
 `
+// The pack's seat colors, read from src/pack.ts's seatColors (importing the pack would pull in every game's screens).
+const SEAT_COLORS = (() => {
+  const match = fs.readFileSync(path.join(ROOT, 'src/pack.ts'), 'utf8').match(/seatColors:\s*\{\s*1:\s*'(#[0-9a-fA-F]{6})',\s*2:\s*'(#[0-9a-fA-F]{6})'\s*\}/)
+  if (!match) throw new Error("couldn't read seatColors from src/pack.ts")
+  return { 1: match[1], 2: match[2] }
+})()
 const RN_STUB = "export const Platform = { OS: 'ios', select: (o) => o.ios ?? o.native ?? o.default }"
 
 // Inside the project, so the bundle's external requires resolve this app's node_modules.
@@ -58,8 +64,8 @@ try {
   // The iPhone 17 Pro Max's screen and safe area, as in store/seed/generate.mjs.
   const board = m.computeBoardLayout(440, 956, { top: 62, bottom: 34, left: 0, right: 0 }, 'classic', 'medium', false)
   const { x, y, width, height, puckRadius, goalWidth } = board
-  const p1 = m.DEFAULT_SEAT_COLORS[1]
-  const p2 = m.DEFAULT_SEAT_COLORS[2]
+  const p1 = SEAT_COLORS[1]
+  const p2 = SEAT_COLORS[2]
   // Board.tsx's dark-mode wallColor and lineColor.
   const wall = '#FFFFFF'
   const line = 'rgba(255,255,255,0.25)'
@@ -172,20 +178,20 @@ html, body { margin: 0; width: ${w}px; height: ${h}px; overflow: hidden; backgro
   ]
     .map(([rx, ry, rw, rh]) => `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${wall}"/>`)
     .join('')
-  const headerFile = page(
-    'header',
-    3840,
-    1646,
-    `<svg width="3840" height="1646" viewBox="0 0 3840 1646" xmlns="http://www.w3.org/2000/svg">
-<rect width="3840" height="1646" fill="#000"/>
+  const headerArt = `<rect width="3840" height="1646" fill="#000"/>
 <g transform="matrix(0 ${s} ${-s} 0 ${1920 + board.centerY * s} ${823 - board.centerX * s})">
 ${rink([4, 2])}
 ${walls}
 ${puckAt(frame, 8, 3)}
-</g></svg>`
-  )
+</g>`
+  const headerFile = page('header', 3840, 1646, `<svg width="3840" height="1646" viewBox="0 0 3840 1646" xmlns="http://www.w3.org/2000/svg">${headerArt}</svg>`)
 
-  // Search results, 3840 x 2560: state the obvious. The headline on the left and the in-play screen on the right, both
+  // Google Play's feature graphic, 1024 x 500: the header's own drawing, its middle cut to Play's 2.048:1 (the whole
+  // 1646 tall, 3371 of its 3840 wide, centered), which keeps the board, both goals and the shot. No words, no frame.
+  const featureW = Math.round((1646 * 1024) / 500)
+  const featureFile = page('feature', 1024, 500, `<svg width="1024" height="500" viewBox="${(3840 - featureW) / 2} 0 ${featureW} 1646" xmlns="http://www.w3.org/2000/svg">${headerArt}</svg>`)
+
+  // Search results, 3840 x 2560: state the obvious. The headline on the left and Home's four games on the right, both
   // inside the safe area (x 836-3004, y 765-1795); the phone runs off the bottom edge.
   const phoneScale = 0.72
   const phoneW = 1320 * phoneScale
@@ -200,7 +206,7 @@ ${puckAt(frame, 8, 3)}
     2560,
     `
 <div class="overlay" style="left:876px;top:765px;width:1120px;height:1030px;display:flex;flex-direction:column;justify-content:center;gap:70px">
-  <div style="font-size:150px;line-height:1.12;font-weight:700">Tabletop<br>Box Hockey</div>
+  <div style="font-size:150px;line-height:1.12;font-weight:700">Four<br>Puck Games</div>
   <div style="font-size:84px;line-height:1.3;font-weight:700;opacity:0.85">Play a Friend<br>or the CPU</div>
   <div style="display:flex;gap:40px"><div style="width:220px;height:16px;border-radius:8px;background:${p1}"></div><div style="width:220px;height:16px;border-radius:8px;background:${p2}"></div></div>
 </div>
@@ -212,11 +218,13 @@ ${puckAt(frame, 8, 3)}
 </div>`
   )
 
-  for (const [file, placement] of [
-    [headerFile, 'header'],
-    [searchFile, 'search']
+  fs.mkdirSync(path.join(OUT_DIR, 'google-play'), { recursive: true })
+  for (const [file, placement, out] of [
+    [headerFile, 'header', 'header.png'],
+    [searchFile, 'search', 'search.png'],
+    [featureFile, 'feature', 'google-play/feature-graphic.png']
   ]) {
-    execFileSync('node', [CREATIVE, file, placement, path.join(OUT_DIR, `${placement}.png`)], { stdio: 'inherit' })
+    execFileSync('node', [CREATIVE, file, placement, path.join(OUT_DIR, out)], { stdio: 'inherit' })
   }
 } finally {
   fs.rmSync(WORK, { recursive: true, force: true })

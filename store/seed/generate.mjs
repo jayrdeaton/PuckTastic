@@ -136,14 +136,24 @@ export function run(nowMs) {
 }
 `
 
-// react-native is only reached for Platform (utils/board.ts); the physics run on the phone's layout.
-const RN_STUB = "export const Platform = { OS: 'ios', select: (o) => o.ios ?? o.native ?? o.default }"
+// react-native is reached for Platform (utils/board.ts; the physics run on the phone's layout), and for PlayerRankings'
+// StyleSheet and View (below).
+const RN_STUB = "export const Platform = { OS: 'ios', select: (o) => o.ios ?? o.native ?? o.default }; export const StyleSheet = { create: (s) => s }; export const View = () => null"
+// The stats engine imports rankProfiles from src/shared/PlayerRankings.tsx, a component file, so the bundle reaches its
+// UI packages (and their JSX, fonts and images) though nothing here draws. They load as an inert CommonJS stand-in, so
+// the named imports resolve and nothing runs: StyleSheet.create hands its styles back, anything else is a no-op.
+const UI_STUB = `const noop = () => undefined
+const stub = new Proxy(noop, { get: (_, key) => (key === '__esModule' ? false : key === 'create' ? (styles) => styles : stub), apply: () => undefined })
+module.exports = stub`
+const UI_PACKAGES = /^(react-native-paper|@tastic\/hud|@tastic\/profile|@expo\/vector-icons|react-native-svg|react-native-reanimated)(\/.*)?$/
 
 // Beside this file, so the bundle's external requires resolve from the app's node_modules.
 const workDir = fs.mkdtempSync(path.join(HERE, '.generate-'))
 try {
   const stub = path.join(workDir, 'react-native.mjs')
   fs.writeFileSync(stub, RN_STUB)
+  const uiStub = path.join(workDir, 'ui.cjs')
+  fs.writeFileSync(uiStub, UI_STUB)
   const bundleFile = path.join(workDir, 'bundle.cjs')
   await build({
     stdin: { contents: ENTRY, resolveDir: ROOT, loader: 'ts' },
@@ -153,7 +163,8 @@ try {
     outfile: bundleFile,
     logLevel: 'error',
     alias: { '@': path.join(ROOT, 'src'), 'react-native': stub },
-    external: ['react', 'react-redux']
+    external: ['react', 'react-redux'],
+    plugins: [{ name: 'ui-stub', setup: (b) => b.onResolve({ filter: UI_PACKAGES }, () => ({ path: uiStub })) }]
   })
   const { run } = createRequire(import.meta.url)(bundleFile)
   const out = run(Date.now())

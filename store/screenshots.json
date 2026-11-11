@@ -2,12 +2,58 @@
   "font": "/System/Library/Fonts/SFNSMono.ttf",
   "out": "screenshots",
   "raw": "screenshots/raw",
-  "background": ["#000000", "#000000"],
+  "background": [
+    "#000000",
+    "#000000"
+  ],
+  "devices": [
+    "iphone",
+    "iphone-medium",
+    "ipad",
+    "android"
+  ],
   "shots": [
-    { "name": "01-play", "title": "Tabletop Box Hockey, No Ads", "sub": "Flick the puck into their goal" },
-    { "name": "02-home", "title": "Play a Friend or the CPU", "sub": "Two Player or One Player" },
-    { "name": "03-goal", "title": "Score Big", "sub": "First to 3, 5, 7, or 10 goals" },
-    { "name": "04-boards", "title": "Pick Your Board", "sub": "Classic, Gauntlet, or Gravity" },
-    { "name": "05-stats", "title": "Stats and 33 Achievements", "sub": "Bronze, silver, and gold to earn" }
+    {
+      "name": "01-boxhockey",
+      "title": "Tabletop Box Hockey",
+      "sub": "Flick the puck into their goal",
+      "alt": "Box Hockey against the CPU: the puck flies up the board through a gap toward the blue goal."
+    },
+    {
+      "name": "02-home",
+      "title": "Four Puck Games, No Ads",
+      "sub": "Play a friend or the CPU",
+      "alt": "PuckTastic's home screen listing Box Hockey, Air Hockey, Paddles and Breaker."
+    },
+    {
+      "name": "03-airhockey",
+      "title": "Air Hockey, Face to Face",
+      "sub": "Two players, one screen",
+      "alt": "Air Hockey for two players on one phone, red at the bottom and blue at the top, the puck between them."
+    },
+    {
+      "name": "04-paddles",
+      "title": "Paddles, the Arcade Original",
+      "sub": "Get the puck past their paddle",
+      "alt": "Paddles against the CPU: the puck crosses the court toward the red paddle, the blue paddle at the far end."
+    },
+    {
+      "name": "05-breaker",
+      "title": "Break Every Brick",
+      "sub": "On your own or head to head",
+      "alt": "Breaker played alone: rows of bricks with some knocked out, and the puck heading back to the paddle."
+    },
+    {
+      "name": "06-boards",
+      "title": "Pick Your Board",
+      "sub": "Classic, Gauntlet, or Gravity",
+      "alt": "Box Hockey's setup screen with the board picker open: Classic, Gauntlet and Gravity."
+    },
+    {
+      "name": "07-stats",
+      "title": "Stats and 138 Achievements",
+      "sub": "Bronze, silver, and gold to earn",
+      "alt": "The Stats screen: a player's wins, goals and streaks, and achievements in bronze, silver and gold."
+    }
   ]
 }
