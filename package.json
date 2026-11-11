@@ -8,7 +8,7 @@
   "scripts": {
     "android": "expo run:android",
     "build": "eas build",
-    "build:web": "npm run verify && WEB_BASE_URL=/boxhockey expo export -p web --output-dir web-build/boxhockey",
+    "build:web": "npm run verify && WEB_BASE_URL=/pucktastic expo export -p web --output-dir web-build/pucktastic",
     "client": "expo start --dev-client",
     "doctor": "expo install --fix && npx expo-doctor@latest",
     "fingerprint:compare": "eas fingerprint:compare",
