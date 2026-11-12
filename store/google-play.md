@@ -85,9 +85,9 @@ How the phone screenshots were made (2026-11-11): the shared `Pixel_9` emulator 
 
 ## Store settings
 
-- **App category:** Game, Sports (the App Store's primary category too).
-- **Tags:** up to five from Play's list, picked in the console (Sports, Arcade, Local Multiplayer, Casual and Offline fit, if offered).
-- **Contact details:** the account's developer email (public), website https://games.infinitetoken.com/pucktastic, no phone.
+- **App category:** Game, Arcade (Jay's pick, 2026-11-12: three of the four are arcade games; the App Store's primary category is Sports).
+- **Tags:** Arcade, Brick break, Casual, Hockey, Sports (Jay, 2026-11-12; Play's list has no air hockey, local multiplayer or offline tag).
+- **Contact details:** email support@infinitetoken.com (public; Jay, 2026-11-12), website https://games.infinitetoken.com/pucktastic, no phone.
 
 ## App content
 
