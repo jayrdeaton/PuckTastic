@@ -27,6 +27,11 @@
       "environment": "production",
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "android": {
+        "env": {
+          "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a"
+        }
       }
     }
   },
