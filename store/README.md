@@ -16,7 +16,7 @@ For 2.0.0:
 6. **Screenshots and art:** delete the old Box Hockey screenshots, upload the three sets in `store/screenshots/`, and the header and search art (below).
 7. **App Review notes:** replace the old notes with the ones below (the old ones describe Lock Orientation, which is gone).
 8. **Pick the build** for 2.0.0, and **Add for Review**.
-9. **Release:** manual (press Release once approved), since this one renames the app and changes what's on the product page.
+9. **Release:** automatic after approval (Jay, 2026-11-12: nothing to wait for).
 
 Every later version: `npm run verify`, `jrd ship build production`, `eas submit -p ios --profile production`, new `releaseNotes` and `apple.version` in `store.config.json` (equal to `app.json`'s `version`), `eas metadata:push`, then pick the build and Add for Review.
 
@@ -111,7 +111,7 @@ The Device ID is the random client ID expo-updates makes at install and sends wi
 
 **Accessibility (optional):** leave blank until each feature has been checked on a device. Apple asks per feature (VoiceOver, Larger Text, Dark Interface, Reduced Motion and so on), and a claim that doesn't hold up is worse than none.
 
-**Version release:** manual for 2.0.0 (you press Release).
+**Version release:** automatic after approval for 2.0.0 (submitted 2026-11-12).
 
 ## Screenshot notes
 
