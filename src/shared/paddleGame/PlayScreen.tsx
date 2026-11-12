@@ -6,7 +6,7 @@ import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { ProfileChip } from '@tastic/profile'
-import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useProfiles } from '@tastic/shell'
+import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useBackBlock, useProfiles } from '@tastic/shell'
 import { needsSharedNeutralZone } from '@tastic/split-screen'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -154,12 +154,12 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   // (react-hooks/immutability flags reading a binding before its own declaration, even one only
   // ever invoked later - see the mirroring effect right after `state` is destructured below) -
   // it's reassigned every render via the same effect-based "ref mirrors latest value" idiom this
-  // file already uses for vibrationRef/soundRef, so requestBack still always calls whatever
-  // lives/bricks/scores were bound to as of the most recently committed render, same as before.
+  // file already uses for vibrationRef/soundRef, so requestBack always reads the progress of the
+  // most recently committed render, same as before.
   // scores stays [0,0] the whole round in solo (see useGameState's TICK case) - a lost life or a
   // broken brick is solo's own equivalent of "there's progress worth confirming before losing it".
-  const hasProgressRef = useRef<() => boolean>(() => false)
-  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => hasProgressRef.current(), safeBack)
+  const hasProgressRef = useRef(false)
+  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => hasProgressRef.current, safeBack)
   // Leaving the app mid-match (home, app switch, a phone call, Control Center) latches a pause that
   // only the Paused dialog's Resume clears - see @tastic/core's useBackgroundPause. Skipped once the
   // match is over, or while a dialog already holds the pause by itself.
@@ -187,13 +187,18 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, ballSpeed, gameMode, hasBricks, paused, serveHeld)
   const { phase, ball, paddles, scores, bounceCount, bricks, lives } = state
 
-  // See hasProgressRef's own comment above - mirrors the real hasProgress check into it every
-  // render, now that lives/bricks/scores actually exist to read.
+  // The real hasProgress check, now that lives/bricks/scores actually exist to read. Once the match is
+  // over (gameOver) its stats are already recorded and nothing is lost, so back exits at once, the
+  // same as the Game Over card's own buttons.
+  const hasProgress = phase !== 'gameOver' && (isSolo ? lives < SOLO_LIVES || bricks.some((b) => b.destroyed) : scores[0] > 0 || scores[1] > 0)
+  // See hasProgressRef's own comment above - mirrors hasProgress into it every render.
   useEffect(() => {
-    // Once the match is over (gameOver) its stats are already recorded and nothing is lost, so back
-    // exits at once, the same as the Game Over card's own buttons.
-    hasProgressRef.current = () => phase !== 'gameOver' && (isSolo ? lives < SOLO_LIVES || bricks.some((b) => b.destroyed) : scores[0] > 0 || scores[1] > 0)
+    hasProgressRef.current = hasProgress
   })
+  // While Quit Match? would ask, Android's back and the browser's back open it too, not just the back
+  // chip (audit F093; @tastic/shell's useBackBlock). quitMatch is Quit Match?'s and Paused's Quit: it
+  // leaves past that block, where safeBack would be stopped by it.
+  const quitMatch = useBackBlock(hasProgress, requestBack)
 
   // Mirrors "an actual live rally, not paused" into liveplay.activelyPlaying for Providers.tsx's
   // EdgeGuardBridge rather than calling useEdgeGestureGuard directly here: it stays mounted once for
@@ -520,10 +525,10 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
           (a deliberate trade-off for convergence onto the shared component). Upright, like every
           dialog since the OS turns the interface: never handed the court's own quarter turn (it was
           until 2026-11-07, so in a tall window Quit Match? and Paused lay on their side). */}
-      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} />
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={quitMatch} onCancel={cancelBack} />
       {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
-      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={quitMatch} />
 
       {/* Upright: since @tastic/shell 0.5 the Settings dialog takes no turn of its own. */}
       <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} />

@@ -5,7 +5,7 @@ import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { useBackgroundPause, useSettledWindowDimensions } from '@tastic/core'
 import { ConfirmDialog, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useProfiles } from '@tastic/shell'
+import { liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useBackBlock, useProfiles } from '@tastic/shell'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -26,6 +26,7 @@ import { DEFAULT_SETTINGS } from '@/games/boxhockey/redux/settingsSlice'
 import { BoardLayout, GameMode, GamePhase, Player } from '@/games/boxhockey/types'
 import { computeBoardLayout, faceoffZoneCenter, faceoffZoneCenters, faceoffZoneRadius } from '@/games/boxhockey/utils/board'
 import { seatToastSpots } from '@/games/boxhockey/utils/seatToastSpots'
+import { matchHasProgress } from '@/shared/matchHasProgress'
 import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
 import { useGameSound } from '@/shared/useGameSound'
@@ -99,14 +100,12 @@ export default function GameScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   // useQuitConfirmation reads hasProgress lazily (only inside a real requestBack() call, via its
   // own ref-mirrored getter - see that hook's own doc) rather than taking a plain boolean, which is
-  // exactly what makes this safe to call before `scores` exists yet: `scores` comes from
-  // useGameState's returned state, which itself needs `paused` (derived from confirmVisible) as an
-  // INPUT, so a plain-boolean argument computed from `scores` here would be a real circular render
-  // dependency. Only asked once there's a real score to lose - 0-0 exits immediately, since there's
-  // nothing yet for a confirmation to protect (mirrors LightCycles' identical quit-confirmation gate).
-  // Once the match is over (gameOver) its stats are already recorded and nothing is lost, so back
-  // exits at once, the same as the Game Over card's own buttons.
-  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => phase !== 'gameOver' && (scores[0] > 0 || scores[1] > 0), safeBack)
+  // exactly what makes this safe to call before `phase` and `scores` exist yet: they come from
+  // useGameState's returned state (below), which itself needs `paused` (derived from confirmVisible)
+  // as an INPUT, so a plain-boolean argument here would be a real circular render dependency.
+  // hasProgressRef is mirrored from them once they exist (below).
+  const hasProgressRef = useRef(false)
+  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => hasProgressRef.current, safeBack)
   // Leaving the app mid-match (home, app switch, a phone call, Control Center) latches a pause that
   // only the Paused dialog's Resume clears - see @tastic/core's useBackgroundPause. Skipped once the
   // match is over, or while a dialog already holds the pause by itself.
@@ -121,6 +120,18 @@ export default function GameScreen() {
 
   const { state, tryAimStart, aimUpdate, aimCancel, shoot, applyStrike, nextRound, resetGame, coinFlipDone, faceoffCount, faceoffHold, faceoffLive, faceoffReady, faceoffTap, faceoffTimeout, faceoffLaunch, faceoffRestart, tripleTapPress, tripleTapSwipe, tripleTapClashEnd, setInterceptTouch } = useGameState(board, scoreToWin, tipoffMode, friction, controlScheme, paused, interceptThreshold)
   const { phase, puck, aim, interceptAim, currentPlayer, scores, bounceCount, lastScoredGoal, wellEnterCount, lastWellPolarity, goalDoorHitCount, lastGoalDoorSide, faceoff, tripleTap } = state
+  // Mirrored for useQuitConfirmation's getter above, which can't read phase and scores directly:
+  // react-hooks/immutability flags reading a binding before its own declaration, even in a closure
+  // only ever invoked later. Effect-based, as vibrationRef/soundRef are, so requestBack reads the
+  // most recently committed render's value.
+  const hasProgress = matchHasProgress(phase, scores)
+  useEffect(() => {
+    hasProgressRef.current = hasProgress
+  })
+  // While Quit Match? would ask, Android's back and the browser's back open it too, not just the back
+  // chip (audit F093; @tastic/shell's useBackBlock). quitMatch is Quit Match?'s and Paused's Quit: it
+  // leaves past that block, where safeBack would be stopped by it.
+  const quitMatch = useBackBlock(hasProgress, requestBack)
 
   // Mirrors "an actual live shot attempt (aiming/striking/simulating), not paused" up to
   // liveplay.activelyPlaying for Providers.tsx's EdgeGuardBridge rather than calling
@@ -917,7 +928,7 @@ export default function GameScreen() {
       </View>
 
       {/* Back + settings chips live in MatchOverlays below, beside its dialogs (see its own comment). */}
-      <MatchOverlays phase={phase} scores={scores} winner={winner} loser={loser} playerColor={playerColor} playerOnColor={playerOnColor} twoPlayer={aiPlayer === null} onResetGame={() => resetGame(board)} confirmVisible={confirmVisible} cancelBack={cancelBack} settingsOpen={settingsOpen} onSettingsDismiss={() => setSettingsOpen(false)} onSettingsOpen={() => setSettingsOpen(true)} board={board} boardAreaMarginTop={boardAreaMarginTop} atComputer={atComputer} onBackPress={requestBack} backgroundPaused={backgroundPaused} onResume={resume} />
+      <MatchOverlays phase={phase} scores={scores} winner={winner} loser={loser} playerColor={playerColor} playerOnColor={playerOnColor} twoPlayer={aiPlayer === null} onResetGame={() => resetGame(board)} confirmVisible={confirmVisible} cancelBack={cancelBack} settingsOpen={settingsOpen} onSettingsDismiss={() => setSettingsOpen(false)} onSettingsOpen={() => setSettingsOpen(true)} board={board} boardAreaMarginTop={boardAreaMarginTop} atComputer={atComputer} onBackPress={requestBack} onQuitMatch={quitMatch} backgroundPaused={backgroundPaused} onResume={resume} />
     </View>
   )
 }
@@ -948,6 +959,8 @@ interface MatchOverlaysProps {
   // GameScreen's atComputer: where 2 Player's toasts and cards go (the chips read it themselves).
   atComputer: boolean
   onBackPress: () => void
+  // Quit Match?'s and Paused's Quit (GameScreen's quitMatch), which gets past the back block.
+  onQuitMatch: () => void
   // GameScreen's useBackgroundPause latch and its resume, for the Paused dialog below.
   backgroundPaused: boolean
   onResume: () => void
@@ -957,7 +970,7 @@ interface MatchOverlaysProps {
 // identically-shaped MatchOverlays. The board is permanently 'faceToFace' (see GameScreen's own
 // comment above) and never turns, and nothing here turns for the device's hold either: the only turn
 // left is player 2's 180 on their own Game Over card and toasts (seatToastSpots).
-function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColor, twoPlayer, onResetGame, confirmVisible, cancelBack, settingsOpen, onSettingsDismiss, onSettingsOpen, board, boardAreaMarginTop, atComputer, onBackPress, backgroundPaused, onResume }: MatchOverlaysProps) {
+function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColor, twoPlayer, onResetGame, confirmVisible, cancelBack, settingsOpen, onSettingsDismiss, onSettingsOpen, board, boardAreaMarginTop, atComputer, onBackPress, onQuitMatch, backgroundPaused, onResume }: MatchOverlaysProps) {
   // Each seat's half and reading angle, shared by 2 Player's Game Over cards and unlock toasts.
   const seatSpots = seatToastSpots(atComputer)
   // The Game Over card and the dialogs' score lines sit on @tastic/hud's OverlayCard, so their text
@@ -1023,11 +1036,11 @@ function MatchOverlays({ phase, scores, winner, loser, playerColor, playerOnColo
           ConfirmDialog supplies its own body Text, which these inherit). Trades away this dialog's old
           secondary-accent Quit button and MONO_FONT styling for the shared component's primary
           accent and default font - an approved trade-off, not an oversight. */}
-      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} />
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={onQuitMatch} onCancel={cancelBack} />
 
       {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
-      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={onResume} onCancel={safeBack} />
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={onResume} onCancel={onQuitMatch} />
 
       <MatchChips playing={playing} faceToFace={twoPlayer} centerLineY={centerLineY} onBack={onBackPress} onSettings={onSettingsOpen} />
 

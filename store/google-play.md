@@ -13,12 +13,12 @@ Checked 2026-11-11 against Play Console Help, the Developer Program Policies and
 - **Shared profiles are iOS and web only:** `@tastic/profile` has no Android module (its App Group bridge is Apple's), so on Android each Tastic game keeps its own profiles. The Android description leaves out the iOS line about sharing them.
 - **The icon:** Android draws `app.json`'s adaptive icon (`android-icon-foreground.png` and `android-icon-monochrome.png` over `#050505`, made by `store/creative/android-icons.py`), so a launcher's mask never cuts the art and themed icons work.
 - **Tablets and Chromebooks:** Android 16 ignores the portrait lock on screens 600dp and wider, so a tablet turns with the OS, as the iPad does (CLAUDE.md, "The OS turns tablets").
-- **Hardware back:** `TODO.md`'s first "After launch" item (audit F093) is still open: Android's back gesture during a match leaves it at once, skipping "Quit Match?" (hud's `ConfirmDialog` only handles back while it's open). It says "before an Android release". Fix it in `@tastic/hud`/`@tastic/shell` first, or decide it can wait.
+- **Hardware back:** audit F093 (Android's back gesture during a match left it at once, skipping "Quit Match?") is fixed in JS (2026-11-12, CLAUDE.md "Back mid-match", on `@tastic/shell`'s `useBackBlock`). It's in the first Android build: `@tastic/shell` 0.9.0 was released and bumped here first (2026-11-12).
 
 ## Jay's steps, in order
 
 1. **Finish the developer account** if it isn't yet (Lumber's `store/google-play.md`, steps 1 and 2: the payments profile, the $25 fee, then identity, organization and website verification).
-2. **Decide on hardware back** (above): fix F093 before the first Android build, or ship without it.
+2. **Hardware back** (above): decided, the first build ships without the F093 fix and an OTA update brings it.
 3. **Create the app** (Play Console, Create app): name PuckTastic, default language English (United States), Game, Free, and the declarations.
 4. **Fill in App content** (the answers below), the **store listing** and **store settings**.
 5. **Build:** `jrd ship build production`, picking All (or Android). The first Android build makes the upload keystore on EAS. It carries the adaptive icon and blocked permissions, which are native.
@@ -80,7 +80,7 @@ How the phone screenshots were made (2026-11-11): the shared `Pixel_9` emulator 
 - **Box Hockey's flick:** a fast `input swipe` (60 ms) fires a shot. **Air Hockey's mallet and the paddles** didn't follow a quick swipe; `input motionevent DOWN`, `MOVE` (several), `UP` in one `adb shell` did, and a held `DOWN` with slow `MOVE`s and `sleep`s keeps a finger on the paddle for the serve.
 - **Moving moments:** `adb shell screenrecord` failed or wrote an empty file about half the time, so the in-play shots are stills from a loop of `adb exec-out screencap -p` (about two a second) during play.
 - **Launching:** `adb shell am start -n com.infinitetoken.boxhockey/.MainActivity` after each reseed; a cold start took over a minute under load, so wait for the window before pressing.
-- Android back left a match at once (F093, still open), which is a quick way out of a round with a score you don't want.
+- Android back left a match at once (F093, fixed in JS since; not in the build these were shot on), which is a quick way out of a round with a score you don't want.
 
 ## Store settings
 

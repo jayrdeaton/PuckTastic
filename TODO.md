@@ -8,7 +8,7 @@ Nothing open: back after the match (F094) was checked live on web 2026-10-16 (se
 
 ## After launch
 
-1. **Android hardware back and web browser back skip "Quit Match?"** (audit F093). Needs hud support (an opt-in `BackHandler` in `useQuitConfirmation`, plus a router-level block for web). Before an Android release; iOS is unaffected.
+1. ✅ **Android hardware back and web browser back skip "Quit Match?"** (audit F093). Fixed in JS 2026-11-12 (CLAUDE.md, "Back mid-match"): `@tastic/shell`'s new `useBackBlock` holds all four games' play screens while Quit Match? would ask. On `@tastic/shell` ^0.9.0 (released 2026-11-12), so it goes out in the first Android build; iOS has no system back mid-match, so its 2.0.0 build needs nothing (the iOS fingerprint is unchanged, so the next OTA carries it anyway), and the web gets it with the next `jrd ship release`. Not checked on an Android device or emulator.
 2. **The Update Available prompt and toasts stay portrait while the screen is turned** (audit F007). The UpdateDialog wrapper passes no `rotation`, and the Toaster sits outside any turned frame. Pass `rotation`, or mount both in hud's `RotatedFrame`.
 3. **Home's hero animation keeps looping under `/loadout` and `/game`** (audit F016). Pause it on blur and in the background, as Solitaire's HeroCards does (`useIsFocused` plus AppState).
 

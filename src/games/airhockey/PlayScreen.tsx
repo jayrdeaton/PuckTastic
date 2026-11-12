@@ -5,7 +5,7 @@ import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useProfiles } from '@tastic/shell'
+import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useBackBlock, useProfiles } from '@tastic/shell'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
@@ -24,6 +24,7 @@ import { DEFAULT_SETTINGS } from '@/games/airhockey/redux/settingsSlice'
 import { GameMode, GoalAxis, Player } from '@/games/airhockey/types'
 import { computeBoardLayout, computeLocalContainerSize } from '@/games/airhockey/utils/board'
 import { seatResultSpots } from '@/games/airhockey/utils/seatResultSpots'
+import { matchHasProgress } from '@/shared/matchHasProgress'
 import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
 import { useGameSound } from '@/shared/useGameSound'
@@ -132,15 +133,13 @@ export default function GameScreen() {
   // Settings/quit-confirm dialogs pause gameplay while open. useQuitConfirmation reads hasProgress
   // lazily (only inside a real requestBack() call, via its own ref-mirrored getter - see that
   // hook's own doc) rather than taking a plain boolean, which is exactly what makes this safe to
-  // call before `scores` exists yet: `scores` comes from useGameState's returned state, which
-  // itself needs `paused` (derived from confirmVisible) as an INPUT, so a plain-boolean argument
-  // computed from `scores` here would be a real circular render dependency. The closure below
-  // still reads whatever `scores` is bound to at the time the closure itself is (re)created each
-  // render, same as a hand-rolled onBackPress body always did before this hook existed.
+  // call before `phase` and `scores` exist yet: they come from useGameState's returned state
+  // (below), which itself needs `paused` (derived from confirmVisible) as an INPUT, so a
+  // plain-boolean argument here would be a real circular render dependency. The closure below
+  // reads whatever hasProgressRef holds, mirrored from `phase` and `scores` once they exist (below).
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Once the match is over (gameOver) its stats are already recorded and nothing is lost, so back
-  // exits at once, the same as the Game Over card's own buttons.
-  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => phase !== 'gameOver' && (scores[0] > 0 || scores[1] > 0), safeBack)
+  const hasProgressRef = useRef(false)
+  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => hasProgressRef.current, safeBack)
   // Leaving the app mid-match (home, app switch, a phone call, Control Center) latches a pause that
   // only the Paused dialog's Resume clears - see @tastic/core's useBackgroundPause. Skipped once the
   // match is over, or while a dialog already holds the pause by itself.
@@ -155,6 +154,18 @@ export default function GameScreen() {
 
   const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
   const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide, puckInPlay } = state
+  // Mirrored for useQuitConfirmation's getter above, which can't read phase and scores directly:
+  // react-hooks/immutability flags reading a binding before its own declaration, even in a closure
+  // only ever invoked later. Effect-based, as vibrationRef/soundRef are, so requestBack reads the
+  // most recently committed render's value.
+  const hasProgress = matchHasProgress(phase, scores)
+  useEffect(() => {
+    hasProgressRef.current = hasProgress
+  })
+  // While Quit Match? would ask, Android's back and the browser's back open it too, not just the back
+  // chip (audit F093; @tastic/shell's useBackBlock). quitMatch is Quit Match?'s and Paused's Quit: it
+  // leaves past that block, where safeBack would be stopped by it.
+  const quitMatch = useBackBlock(hasProgress, requestBack)
 
   // Mirrors "an actual live rally, not paused" into liveplay.activelyPlaying for Providers.tsx's
   // EdgeGuardBridge rather than calling useEdgeGestureGuard directly here: it stays mounted once for
@@ -357,10 +368,10 @@ export default function GameScreen() {
       rolled overlay, always upright.
       Trades this dialog's previous secondary-accent Quit button and MONO_FONT styling for the
       shared component's primary accent and default font - an accepted trade-off. */}
-      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} />
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={quitMatch} onCancel={cancelBack} />
       {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
-      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} />
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={quitMatch} />
 
       {/* Back + settings: the shell's MatchChips (see faceToFace above). Up until the puck is in play:
       through every faceoff, until a paddle first strikes the puck (puckInPlay), so there's time to
