@@ -156,7 +156,7 @@ html, body { margin: 0; width: ${w}px; height: ${h}px; overflow: hidden; backgro
     return file
   }
 
-  // Header, 3840 x 1646: one idea, the shot. The whole box on its side (the way it turns when the phone does), walled
+  // Header, 3840 x 1646: one idea, the shot (its frame picked at the feature graphic's scale, s, below). The whole box on its side (the way it turns when the phone does), walled
   // the way Board draws it on desktop web, P1's red end on the left and P2's blue on the right, match point for red, and
   // the puck just through the divider, inside the safe area (x 1097-2743, y 493-1154), on its way into the blue goal. No
   // words: the name sits right under it. Portrait (px, py) turns 90 degrees: P1's bottom goes left, the left wall the top.
@@ -178,34 +178,50 @@ html, body { margin: 0; width: ${w}px; height: ${h}px; overflow: hidden; backgro
   ]
     .map(([rx, ry, rw, rh]) => `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${wall}"/>`)
     .join('')
-  const headerArt = `<rect width="3840" height="1646" fill="#000"/>
-<g transform="matrix(0 ${s} ${-s} 0 ${1920 + board.centerY * s} ${823 - board.centerX * s})">
+  // The board turned and drawn at `scale`, its center at (1920, cy).
+  const turned = (scale, ex, ey) => `<rect width="3840" height="1646" fill="#000"/>
+<g transform="matrix(0 ${scale} ${-scale} 0 ${ex} ${ey})">
 ${rink([4, 2])}
 ${walls}
 ${puckAt(frame, 8, 3)}
 </g>`
+  // The header's board fits inside what every device shows of the header in App Store Connect's Device Preview (about
+  // x 330-3510 on the iPhone, y 190-1290 on iPad landscape; the app-store-prep skill's references/apple.md), 30 px clear
+  // of the top and bottom: at 3.2 its long walls ran past both on iPad landscape and the rink looked open there
+  // (2026-11-12). The same shot and frame, centered in that band (y 740). Google Play shows all of its feature graphic,
+  // so that keeps the board at 3.2 (featureArt).
+  const boxCX = x + width / 2
+  const boxCY = y + height / 2
+  const hs = (1290 - 190 - 60) / (width + wt * 2)
+  const headerArt = turned(hs, 1920 + boxCY * hs, 740 - boxCX * hs)
   const headerFile = page('header', 3840, 1646, `<svg width="3840" height="1646" viewBox="0 0 3840 1646" xmlns="http://www.w3.org/2000/svg">${headerArt}</svg>`)
 
-  // Google Play's feature graphic, 1024 x 500: the header's own drawing, its middle cut to Play's 2.048:1 (the whole
-  // 1646 tall, 3371 of its 3840 wide, centered), which keeps the board, both goals and the shot. No words, no frame.
+  // Google Play's feature graphic, 1024 x 500: the board as the first header drew it (3.2, centered on the 21:9), its
+  // middle cut to Play's 2.048:1 (the whole 1646 tall, 3371 of its 3840 wide, centered), which keeps the board, both
+  // goals and the shot. No words, no frame.
+  const featureArt = turned(s, 1920 + board.centerY * s, 823 - board.centerX * s)
   const featureW = Math.round((1646 * 1024) / 500)
-  const featureFile = page('feature', 1024, 500, `<svg width="1024" height="500" viewBox="${(3840 - featureW) / 2} 0 ${featureW} 1646" xmlns="http://www.w3.org/2000/svg">${headerArt}</svg>`)
+  const featureFile = page('feature', 1024, 500, `<svg width="1024" height="500" viewBox="${(3840 - featureW) / 2} 0 ${featureW} 1646" xmlns="http://www.w3.org/2000/svg">${featureArt}</svg>`)
 
-  // Search results, 3840 x 2560: state the obvious. The headline on the left and Home's four games on the right, both
-  // inside the safe area (x 836-3004, y 765-1795); the phone runs off the bottom edge.
-  const phoneScale = 0.72
+  // Search results, 3840 x 2560: state the obvious. The headline on the left and Home's four games on the right. The
+  // iPhone's search card shows only the top of the image (the full width, y 0 to about 1500, in App Store Connect's
+  // Device Preview, measured for SlingScan), so the words are centered in that strip and the phone is sized and placed
+  // so Home's title and all four game rows, down to Breaker's (the capture's y 2316), sit above y 1470. Inside Apple's
+  // template safe area (y 765-1795) the subline fell below the strip. The iPad shows all of it.
+  const STRIP = 1500
+  const phoneScale = 0.6
   const phoneW = 1320 * phoneScale
   const phoneH = 2868 * phoneScale
   const bezel = 22
-  const phoneLeft = 2020
-  const phoneTop = 640
+  const phoneLeft = 2100
+  const phoneTop = 80
   const radius = 165 * phoneScale
   const searchFile = page(
     'search',
     3840,
     2560,
     `
-<div class="overlay" style="left:876px;top:765px;width:1120px;height:1030px;display:flex;flex-direction:column;justify-content:center;gap:70px">
+<div class="overlay" style="left:876px;top:0;width:1120px;height:${STRIP}px;display:flex;flex-direction:column;justify-content:center;gap:70px">
   <div style="font-size:150px;line-height:1.12;font-weight:700">Four<br>Puck Games</div>
   <div style="font-size:84px;line-height:1.3;font-weight:700;opacity:0.85">Play a Friend<br>or the CPU</div>
   <div style="display:flex;gap:40px"><div style="width:220px;height:16px;border-radius:8px;background:${p1}"></div><div style="width:220px;height:16px;border-radius:8px;background:${p2}"></div></div>

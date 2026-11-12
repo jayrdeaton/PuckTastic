@@ -62,7 +62,7 @@ Open source on GitHub: https://github.com/jayrdeaton/PuckTastic
 **Graphics** (in `store/screenshots/google-play/`, gitignored):
 
 - **App icon:** `icon-512.png`, 512 x 512, 32-bit PNG with alpha, from `assets/images/icon-dark.png` (opaque, as the iOS icon). Google rounds its corners itself.
-- **Feature graphic:** `feature-graphic.png`, 1024 x 500, no alpha, drawn by `node store/creative/build.mjs` from the App Store header's own drawing, its middle cut to Play's shape: Box Hockey's board on its side, red's end left and blue's right, a real shot just through a divider hole on its way into blue's goal. No words, no device frame.
+- **Feature graphic:** `feature-graphic.png`, 1024 x 500, no alpha, drawn by `node store/creative/build.mjs` from the first App Store header's drawing (the board at 3.2x its points; Play shows all of its graphic, while the App Store header draws it smaller since 2026-11-12 so no device cuts it), its middle cut to Play's shape: Box Hockey's board on its side, red's end left and blue's right, a real shot just through a divider hole on its way into blue's goal. No words, no device frame.
 - **Phone screenshots:** `store/screenshots/android/`, 1440x2560, the same seven shots and captions as the App Store's (`store/screenshots.json`), in this order, with this alt text (140 at most each):
   1. Tabletop Box Hockey: "Box Hockey against the CPU: the puck flies up the board through a gap toward the blue goal."
   2. Four Puck Games, No Ads: "PuckTastic's home screen listing Box Hockey, Air Hockey, Paddles and Breaker."
