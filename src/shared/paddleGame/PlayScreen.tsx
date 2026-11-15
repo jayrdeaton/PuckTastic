@@ -184,8 +184,11 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
   const [touching, setTouching] = useState<Record<Player, boolean>>({ 1: false, 2: false })
   const handleTouchingChange = useCallback((player: Player, isTouching: boolean) => setTouching((current) => (current[player] === isTouching ? current : { ...current, [player]: isTouching })), [])
   const serveHeld = !atComputer && !tiltControlActive && humanPlayers.some((player) => !touching[player])
-  const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, ballSpeed, gameMode, hasBricks, paused, serveHeld)
-  const { phase, ball, paddles, scores, bounceCount, bricks, lives } = state
+  const { state, live, onStep, drawn, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, ballSpeed, gameMode, hasBricks, paused, serveHeld)
+  // The keyboard's baseline and tilt's calibration: where a paddle is now, not at the last render
+  // (see KeyboardInputLayer).
+  const livePaddleY = useCallback((player: Player) => live().paddles[player].y, [live])
+  const { phase, scores, bounceCount, bricks, lives } = state
 
   // The real hasProgress check, now that lives/bricks/scores actually exist to read. Once the match is
   // over (gameOver) its stats are already recorded and nothing is lost, so back exits at once, the
@@ -220,7 +223,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
     if (phase === 'live') clearToasts()
   }, [phase, clearToasts])
 
-  useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
+  useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget, onStep)
 
   // 2 Player: each seat's half of the screen and the angle it reads at, for its Game Over card
   // (SeatResultCards) and its unlock toasts (SeatToasters) alike, so a player's toasts sit where
@@ -402,7 +405,7 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
           courtRotationStyle
         ]}
       >
-        <Board board={board} ball={ball} paddles={paddles} phase={phase} showWalls={desktopBoard} bricks={bricks} soloMode={isSolo} />
+        <Board board={board} drawn={drawn} phase={phase} showWalls={desktopBoard} bricks={bricks} soloMode={isSolo} />
       </View>
 
       {/* Touch input - deliberately a SIBLING of the board's own rotated container, not nested
@@ -415,15 +418,14 @@ export function PaddlePlayScreen({ game, defaults, hasBricks, recordMatchOutcome
       <TouchInputLayer humanPlayers={humanPlayers} enabled={!paused && phase !== 'gameOver'} containerHeight={containerHeight} rotation={rotation} onPaddleTargetY={setPaddleTarget} onTouchingChange={handleTouchingChange} />
 
       {/* Web-only, additive keyboard input - see that component's own doc for why it needs no
-      rotation-awareness the way TouchInputLayer does. paddles[1].y/paddles[2].y are read fresh
-      every frame internally (not reactively), so passing the current `paddles` snapshot here on
-      every render is exactly right, not stale. */}
-      <KeyboardInputLayer enabled={!paused && phase !== 'gameOver'} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddleY={{ 1: paddles[1].y, 2: paddles[2].y }} onPaddleTargetY={setPaddleTarget} />
+      rotation-awareness the way TouchInputLayer does. It reads the paddles' live Ys every frame
+      (livePaddleY), since a tick that only moves them doesn't render. */}
+      <KeyboardInputLayer enabled={!paused && phase !== 'gameOver'} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddleY={livePaddleY} onPaddleTargetY={setPaddleTarget} />
 
       {/* Additive on top of TouchInputLayer's own always-on drag input, same precedent as
       KeyboardInputLayer above - see that component's own doc for why this never disables touch.
       Always mounted (inert whenever `enabled` is false), same convention as the other two layers. */}
-      <TiltInputLayer player={humanPlayers[0]} enabled={tiltControlActive && !paused && phase !== 'gameOver'} phase={phase} rotation={rotation} board={board} paddleY={paddles[humanPlayers[0]].y} onPaddleTargetY={setPaddleTarget} />
+      <TiltInputLayer player={humanPlayers[0]} enabled={tiltControlActive && !paused && phase !== 'gameOver'} phase={phase} rotation={rotation} board={board} paddleY={livePaddleY} onPaddleTargetY={setPaddleTarget} />
 
       {/* Score labels - plain react-native-paper Text, not on the Skia canvas, small and faded
           against the side wall beside the center line, each on its own player's side (see

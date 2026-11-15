@@ -12,6 +12,7 @@ import { AimIndicator, BoardLayout, ControlScheme, FaceoffState, GamePhase, Play
 import { faceoffZoneCenter, faceoffZoneRadius } from '@/games/boxhockey/utils/board'
 import { computeAimVector, computeTrajectory, TrajectoryPoint } from '@/games/boxhockey/utils/physics'
 import { stickBladeRadius } from '@/games/boxhockey/utils/stick'
+import { useDrawnPoint } from '@/shared/motion/useMotionReducer'
 
 import { GravityWellMarker } from './GravityWellMarker'
 
@@ -245,7 +246,11 @@ function otherZoneIndex(z: 0 | 1): 0 | 1 {
 
 export interface BoardProps {
   board: BoardLayout
+  // The puck as of the last render: where it rests, and what the aiming visuals are worked out from.
+  // While it moves it's drawn from `drawn` instead (useGameState's, [x, y]), on the UI thread: a step
+  // that only moves the puck doesn't render (see useMotionReducer).
   puck: PuckState
+  drawn: SharedValue<number[]>
   // Merged by game.tsx from state.aim ?? state.interceptAim - non-null during a normal 'aiming'/
   // 'striking' turn OR a mid-slide intercept drag (see isIntercepting below for telling those apart).
   aim: AimIndicator | null
@@ -312,7 +317,7 @@ export interface BoardProps {
   friction: number
 }
 
-export default function Board({ board, puck, aim, phase, currentPlayer, aimingPlayer, isIntercepting, puckInterceptable, lastScoredGoal, scores, scoreToWin, goalDoorHitCount, lastGoalDoorSide, faceoff, tripleTap, controlScheme, coinFlipStarted, showWalls, previewLengthPx, shotPreviewLength, friction }: BoardProps) {
+export default function Board({ board, puck, drawn, aim, phase, currentPlayer, aimingPlayer, isIntercepting, puckInterceptable, lastScoredGoal, scores, scoreToWin, goalDoorHitCount, lastGoalDoorSide, faceoff, tripleTap, controlScheme, coinFlipStarted, showWalls, previewLengthPx, shotPreviewLength, friction }: BoardProps) {
   const { x, y, width, height, goalLeft, goalRight, wallThickness, puckRadius, obstacles, gravityWells, goalPosts, wallPosts } = board
 
   const goalAbsLeft = x + goalLeft
@@ -367,7 +372,7 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
   // below (glowR's idle/aiming pulse) stay current even if the board is resized (screen rotation,
   // etc.), hoisted up here so those derivations can use it too. Mirrored via useLayoutEffect, not
   // assigned directly during render - Reanimated's strict mode flags writing to `.value` mid-render
-  // (it fired on every single frame this was live, since Board re-renders every physics tick during
+  // (it fired on every single frame this was live, back when Board rendered every physics tick during
   // 'simulating'/'striking'), and useLayoutEffect corrects the value before paint just like
   // strikeX/Y's own layout effect below, so there's no stale-frame flash from deferring to a plain
   // useEffect instead.
@@ -404,6 +409,14 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
   const glowR = useDerivedValue(() => puckRadiusSV.value * (isAimingSized ? 1.45 : 1.3 + idlePulseT.value * 0.35))
   const ringColor = showIdlePulse ? activePlayerColor : '#FFFFFF'
   const ringOpacity = useDerivedValue(() => (showIdlePulse ? 0.65 + idlePulseT.value * 0.35 : 1))
+
+  // Where the puck is drawn (see BoardProps.drawn), and the shift from the rendered puck to it for
+  // the visuals that hang off the puck (the aiming stick, front arrow, chevron trail and the stick's
+  // aim line). They're worked out from the rendered puck, which a mid-slide intercept drag renders
+  // every step, while the puck itself is drawn a little behind its steps; the shift keeps them on it.
+  // At rest the two are the same and the shift is nothing.
+  const puckTransform = useDrawnPoint(drawn, 0)
+  const puckShift = useDerivedValue(() => [{ translateX: drawn.value[0] - puck.x }, { translateY: drawn.value[1] - puck.y }], [puck.x, puck.y])
 
   // ─── Gravity well particle clock ──────────────────────────────────────────
   // Decorative, independent of the physics loop - runs continuously regardless
@@ -1436,7 +1449,7 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
           {/* Aim direction chevrons - dashed trail (base color + a brighter sweeping highlight per
             chevron, see ChevronMark above) bending to follow a bank shot's post-bounce direction
             wherever previewLengthPx reaches far enough to reveal it. */}
-          {chevronPlacements.map((path, i) => path && <ChevronMark key={i} path={path} index={i} sweepPhase={chevronSweepPhase} color={activePlayerColor} fade={chevronFade(i, chevronPlacements.length)} />)}
+          <Group transform={puckShift}>{chevronPlacements.map((path, i) => path && <ChevronMark key={i} path={path} index={i} sweepPhase={chevronSweepPhase} color={activePlayerColor} fade={chevronFade(i, chevronPlacements.length)} />)}</Group>
 
           {/* Phantom puck - a drag-distance indicator anchored at the exact point you first touched
             down (aim.startX/Y), distinct from the real puck below. Releasing back near it is
@@ -1471,7 +1484,11 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
             comes from swipe speed, not distance, so a stick here would show a pulled-back position
             that has no bearing on the actual shot. The front arrow/chevron trail below are NOT
             gated the same way - that preview stays meaningful for 'flick' too. */}
-          {!isFlick && !isStick && isAimingSized && aim && shotPreviewLength !== 'off' && <Path path={aimingPaddlePath} color={activePlayerColor} opacity={cancelZoneFadeOpacity} />}
+          {!isFlick && !isStick && isAimingSized && aim && shotPreviewLength !== 'off' && (
+            <Group transform={puckShift}>
+              <Path path={aimingPaddlePath} color={activePlayerColor} opacity={cancelZoneFadeOpacity} />
+            </Group>
+          )}
           {!isFlick && phase === 'striking' && <Path path={strikingPaddlePath} color={activePlayerColor} />}
 
           {/* Stick blade - where the finger's blade actually is (kept inside the walls by the
@@ -1480,7 +1497,11 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
             it (straight away from the blade), once the blade is clear of the puck. */}
           {isStick && isAimingSized && aim && (
             <Group>
-              {shotPreviewLength !== 'off' && aim.stickClear && stickAimLine && <Line p1={vec(stickAimLine.x0, stickAimLine.y0)} p2={vec(stickAimLine.x1, stickAimLine.y1)} color={activePlayerColor} style='stroke' strokeWidth={2} strokeCap='round' opacity={0.35} />}
+              {shotPreviewLength !== 'off' && aim.stickClear && stickAimLine && (
+                <Group transform={puckShift}>
+                  <Line p1={vec(stickAimLine.x0, stickAimLine.y0)} p2={vec(stickAimLine.x1, stickAimLine.y1)} color={activePlayerColor} style='stroke' strokeWidth={2} strokeCap='round' opacity={0.35} />
+                </Group>
+              )}
               <Circle cx={aim.currentX} cy={aim.currentY} r={stickBladeRadius(board)} color={activePlayerColor} opacity={0.85} />
             </Group>
           )}
@@ -1489,7 +1510,11 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
             puck's opposite side at the identical pulled-back distance, so the two always read as
             one matched pair: stick behind, arrow ahead - including fading in/out together via the
             same cancelZoneFadeOpacity. */}
-          {frontArrowPath && <Path path={frontArrowPath} color={activePlayerColor} opacity={cancelZoneFadeOpacity} />}
+          {frontArrowPath && (
+            <Group transform={puckShift}>
+              <Path path={frontArrowPath} color={activePlayerColor} opacity={cancelZoneFadeOpacity} />
+            </Group>
+          )}
 
           {/* Puck (+ glow, ring) - never clipped, rink pocket setting on or off. An earlier version
             clipped this to the front-line rectangle whenever the puck sat within the goal's own
@@ -1507,17 +1532,18 @@ export default function Board({ board, puck, aim, phase, currentPlayer, aimingPl
           {phase !== 'coinFlip' && (
             // opacity={puckVisibleO} is a no-op (1) outside the goal-celebration window - see that
             // effect above - so this doesn't touch normal puck visibility at all.
-            <Group opacity={puckVisibleO}>
+            <Group opacity={puckVisibleO} transform={puckTransform}>
               {/* Puck glow - real game-phase-driven halo (isAimingSized/idle/interceptable), stays
-                app-local; not part of the shared Disc fill+ring below (see its own comment). */}
-              {(phase === 'idle' || isAimingSized || puckInterceptable) && <Circle cx={puck.x} cy={puck.y} r={glowR} color={glowColor} />}
+                app-local; not part of the shared Disc fill+ring below (see its own comment). Drawn
+                at (0, 0), as is the puck: the Group puts both where the puck is drawn. */}
+              {(phase === 'idle' || isAimingSized || puckInterceptable) && <Circle cx={0} cy={0} r={glowR} color={glowColor} />}
 
               {/* Puck - always a flat black fill, in every phase and regardless of theme. The ring
                 recolors to activePlayerColor and pulses only while waiting for a shot (idle); every
                 other phase it's a plain, literal white - see idlePulseT/ringColor/ringOpacity above.
                 Shared @tastic/sprites/shapes Disc (confirmed identical fill+ring shape, same 2px
                 default ring strokeWidth). */}
-              <Disc x={puck.x} y={puck.y} radius={puckRadius} color='#000000' ringColor={ringColor} ringWidth={2} ringOpacity={ringOpacity} />
+              <Disc x={0} y={0} radius={puckRadius} color='#000000' ringColor={ringColor} ringWidth={2} ringOpacity={ringOpacity} />
             </Group>
           )}
 

@@ -118,7 +118,7 @@ export default function GameScreen() {
   useKeepAwake('game')
   const paused = settingsOpen || confirmVisible || backgroundPaused
 
-  const { state, tryAimStart, aimUpdate, aimCancel, shoot, applyStrike, nextRound, resetGame, coinFlipDone, faceoffCount, faceoffHold, faceoffLive, faceoffReady, faceoffTap, faceoffTimeout, faceoffLaunch, faceoffRestart, tripleTapPress, tripleTapSwipe, tripleTapClashEnd, setInterceptTouch } = useGameState(board, scoreToWin, tipoffMode, friction, controlScheme, paused, interceptThreshold)
+  const { state, live, drawn, tryAimStart, aimUpdate, aimCancel, shoot, applyStrike, nextRound, resetGame, coinFlipDone, faceoffCount, faceoffHold, faceoffLive, faceoffReady, faceoffTap, faceoffTimeout, faceoffLaunch, faceoffRestart, tripleTapPress, tripleTapSwipe, tripleTapClashEnd, setInterceptTouch } = useGameState(board, scoreToWin, tipoffMode, friction, controlScheme, paused, interceptThreshold)
   const { phase, puck, aim, interceptAim, currentPlayer, scores, bounceCount, lastScoredGoal, wellEnterCount, lastWellPolarity, goalDoorHitCount, lastGoalDoorSide, faceoff, tripleTap } = state
   // Mirrored for useQuitConfirmation's getter above, which can't read phase and scores directly:
   // react-hooks/immutability flags reading a binding before its own declaration, even in a closure
@@ -156,7 +156,7 @@ export default function GameScreen() {
     if (isLiveShot) clearToasts()
   }, [isLiveShot, clearToasts])
 
-  useAIOpponent(state, board, aiPlayer, aiDifficulty, friction, controlScheme, paused, interceptThreshold, { tryAimStart, aimUpdate, shoot })
+  useAIOpponent(state, board, aiPlayer, aiDifficulty, friction, controlScheme, paused, interceptThreshold, { live, tryAimStart, aimUpdate, shoot })
   useFaceoff(state, board, aiPlayer, aiDifficulty, paused, { faceoffCount, faceoffHold, faceoffLive, faceoffReady, faceoffTap, faceoffTimeout, faceoffLaunch, faceoffRestart })
   useTripleTap(state, aiPlayer, aiDifficulty, paused, { tripleTapPress, tripleTapSwipe, tripleTapClashEnd })
 
@@ -857,7 +857,7 @@ export default function GameScreen() {
       <View style={[styles.boardArea, { marginTop: boardAreaMarginTop }]}>
         <GestureDetector gesture={panGesture.enabled(gestureEnabled)}>
           <View style={styles.boardAreaTouchable}>
-            <Board board={board} puck={puck} aim={displayAim} phase={phase} currentPlayer={currentPlayer} aimingPlayer={aimingPlayer} isIntercepting={isIntercepting} puckInterceptable={puckInterceptable} lastScoredGoal={lastScoredGoal} scores={scores} scoreToWin={scoreToWin} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} faceoff={faceoff} tripleTap={tripleTap} controlScheme={controlScheme[aimingPlayer]} coinFlipStarted={coinFlipStarted} showWalls={desktopBoard} previewLengthPx={shotPreviewLengthPx} shotPreviewLength={roundSettings.shotPreviewLength} friction={friction} />
+            <Board board={board} puck={puck} drawn={drawn} aim={displayAim} phase={phase} currentPlayer={currentPlayer} aimingPlayer={aimingPlayer} isIntercepting={isIntercepting} puckInterceptable={puckInterceptable} lastScoredGoal={lastScoredGoal} scores={scores} scoreToWin={scoreToWin} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} faceoff={faceoff} tripleTap={tripleTap} controlScheme={controlScheme[aimingPlayer]} coinFlipStarted={coinFlipStarted} showWalls={desktopBoard} previewLengthPx={shotPreviewLengthPx} shotPreviewLength={roundSettings.shotPreviewLength} friction={friction} />
           </View>
         </GestureDetector>
 

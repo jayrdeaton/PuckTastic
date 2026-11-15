@@ -19,10 +19,10 @@ export interface TiltInputLayerProps {
   // Read fresh each sample, since an iPad turning mid-round changes it.
   rotation: 0 | -90
   board: BoardLayout
-  // This player's CURRENT paddle Y, mirrored every render (not read once) - same pattern
-  // KeyboardInputLayer's own `paddleY` prop uses, since (re)calibration needs the FRESH value at
-  // the exact moment it fires, not a stale render-time snapshot.
-  paddleY: number
+  // This player's CURRENT paddle Y (the live state's, useGameState's `live`), read at the moment
+  // (re)calibration fires. A getter, not a prop: a physics tick that only moves the paddle doesn't
+  // render (see useMotionReducer), so a rendered Y would be stale, as KeyboardInputLayer's is too.
+  paddleY: (player: Player) => number
   onPaddleTargetY: (player: Player, y: number) => void
 }
 
@@ -68,7 +68,7 @@ export default function TiltInputLayer({ player, enabled, phase, rotation, board
       const orientation = interfaceOrientation.current(measurement.orientation)
 
       if (needsCalibrationRef.current || baselineRef.current?.orientation !== orientation) {
-        baselineRef.current = calibrateTiltBaseline(sensorRotation.beta, sensorRotation.gamma, paddleY, orientation)
+        baselineRef.current = calibrateTiltBaseline(sensorRotation.beta, sensorRotation.gamma, paddleY(player), orientation)
         needsCalibrationRef.current = false
         return
       }

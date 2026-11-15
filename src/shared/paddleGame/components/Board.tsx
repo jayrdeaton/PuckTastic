@@ -1,16 +1,19 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
-import { Canvas, DashPathEffect, Line, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
+import { Canvas, DashPathEffect, Group, Line, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { Disc, ObstacleRect } from '@tastic/sprites/shapes'
 import { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { cancelAnimation, Easing, useDerivedValue, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
+import { cancelAnimation, Easing, SharedValue, useDerivedValue, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 
-import { BallState, BoardLayout, Brick, GamePhase, PaddleStates } from '@/shared/paddleGame/types'
+import { useDrawnPoint } from '@/shared/motion/useMotionReducer'
+import { BoardLayout, Brick, GamePhase } from '@/shared/paddleGame/types'
 
 export interface BoardProps {
   board: BoardLayout
-  ball: BallState
-  paddles: PaddleStates
+  // Where the ball and paddles are drawn, on the UI thread (useGameState's `drawn`: the ball, player
+  // 1's paddle, player 2's, [x, y] each). A tick that only moves them doesn't render (see
+  // useMotionReducer).
+  drawn: SharedValue<number[]>
   phase: GamePhase
   // Perimeter top/bottom walls - see game.tsx's isDesktopWeb. On a phone (native or mobile web)
   // they'd sit redundantly right against the device's own physical edge, which already reads as the
@@ -27,7 +30,7 @@ export interface BoardProps {
 // bounces, a little stronger than the dashed center line.
 const FAR_LINE_WIDTH = 2
 
-export default function Board({ board, ball, paddles, phase, showWalls, bricks, soloMode }: BoardProps) {
+export default function Board({ board, drawn, phase, showWalls, bricks, soloMode }: BoardProps) {
   const { x, y, width, height, wallThickness, ballRadius, paddleWidth, paddleHeight } = board
   const { colors: themeColors, dark } = useAutoPaperTheme()
 
@@ -60,6 +63,11 @@ export default function Board({ board, ball, paddles, phase, showWalls, bricks, 
   // ~0.3x paddleWidth corner radius, per the design spec - a small, subtle round rather than a
   // fully pill-shaped bar.
   const paddleCornerRadius = paddleWidth * 0.3
+
+  // Each moving piece is drawn around (0, 0) inside a Group that puts it where it's drawn now.
+  const ballTransform = useDrawnPoint(drawn, 0)
+  const p1Transform = useDrawnPoint(drawn, 1)
+  const p2Transform = useDrawnPoint(drawn, 2)
 
   return (
     <View style={styles.container}>
@@ -102,15 +110,23 @@ export default function Board({ board, ball, paddles, phase, showWalls, bricks, 
           ))}
 
         {/* Paddles - bars, not discs (see BoardLayout's own paddleWidth/paddleHeight doc comment in
-            types/index.ts): each only ever moves on Y, drawn centered on paddles[player].y at its
-            fixed board.paddleX[player]. P2 doesn't exist in solo - see soloMode above. */}
-        <RoundedRect x={paddles[1].x - paddleWidth / 2} y={paddles[1].y - paddleHeight / 2} width={paddleWidth} height={paddleHeight} r={paddleCornerRadius} color={p1Color} />
-        {!soloMode && <RoundedRect x={paddles[2].x - paddleWidth / 2} y={paddles[2].y - paddleHeight / 2} width={paddleWidth} height={paddleHeight} r={paddleCornerRadius} color={p2Color} />}
+            types/index.ts): each only ever moves on Y, drawn centered on its paddle's Y at its fixed
+            board.paddleX[player]. P2 doesn't exist in solo - see soloMode above. */}
+        <Group transform={p1Transform}>
+          <RoundedRect x={-paddleWidth / 2} y={-paddleHeight / 2} width={paddleWidth} height={paddleHeight} r={paddleCornerRadius} color={p1Color} />
+        </Group>
+        {!soloMode && (
+          <Group transform={p2Transform}>
+            <RoundedRect x={-paddleWidth / 2} y={-paddleHeight / 2} width={paddleWidth} height={paddleHeight} r={paddleCornerRadius} color={p2Color} />
+          </Group>
+        )}
 
         {/* The ball, drawn as a puck (PuckTastic's paddle games): Air Hockey's flat black puck with
             a white ring, so it reads on either theme, softly pulsing while waiting to go live. The
             physics still call it the ball. */}
-        <Disc x={ball.x} y={ball.y} radius={ballRadius} color='#000000' ringColor='#FFFFFF' opacity={ballOpacity} />
+        <Group transform={ballTransform}>
+          <Disc x={0} y={0} radius={ballRadius} color='#000000' ringColor='#FFFFFF' opacity={ballOpacity} />
+        </Group>
       </Canvas>
     </View>
   )

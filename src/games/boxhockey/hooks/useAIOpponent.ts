@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import { CONTROL_SCHEME_SIGN, MAX_FLICK_VELOCITY, MAX_SPEED, MAX_STICK_PULLBACK_PIXELS, STICK_VELOCITY_SCALE } from '@/games/boxhockey/constants/game'
 import { BoardLayout, ControlScheme, GameState, Player, PuckState } from '@/games/boxhockey/types'
@@ -6,6 +6,9 @@ import { AIDifficulty, planAIShot, randomAIThinkDelayMs, randomInterceptReaction
 import { planStickSwing } from '@/games/boxhockey/utils/stick'
 
 interface AIControls {
+  // The live state (useGameState's), for where the puck is now: a step that only moves the puck
+  // doesn't render, so `state.puck` is where it was at the last render.
+  live: () => GameState
   tryAimStart: (touchX: number, touchY: number) => boolean
   aimUpdate: (x: number, y: number, vx: number, vy: number) => void
   shoot: (dx: number, dy: number, vx: number, vy: number) => void
@@ -31,7 +34,7 @@ type After = (ms: number, fn: () => void) => void
 // positions are placed relative to the puck's live position (getPuck), so a mid-slide intercept
 // swing tracks a moving puck, and its velocity adds the puck's own motion so the swing's speed
 // relative to the puck is the planned one.
-function scheduleStickSwing(after: After, getPuck: () => PuckState, fx: number, fy: number, power: number, board: BoardLayout, controls: AIControls): void {
+function scheduleStickSwing(after: After, getPuck: () => PuckState, fx: number, fy: number, power: number, board: BoardLayout, controls: Omit<AIControls, 'live'>): void {
   const puck = getPuck()
   const plan = planStickSwing(puck, fx, fy, power * MAX_SPEED, board)
   const offsetX = plan.startX - puck.x
@@ -57,15 +60,7 @@ function otherPlayer(p: Player): Player {
 // human drag uses - no reducer or physics changes needed, the AI just plays the existing gesture
 // contract on the puck's behalf once it's `aiPlayer`'s turn.
 export function useAIOpponent(state: GameState, board: BoardLayout, aiPlayer: Player | null, difficulty: AIDifficulty, friction: number, controlScheme: Record<Player, ControlScheme>, paused: boolean, interceptThreshold: number, controls: AIControls): void {
-  const { tryAimStart, aimUpdate, shoot } = controls
-
-  // Mirrored every render (same discipline as this codebase's other rapidly-churning-state refs -
-  // e.g. game.tsx's faceoffRef) so the intercept effect below can read the FRESHEST puck position
-  // at each scheduled step, not a stale one captured back when eligibility first fired.
-  const puckRef = useRef(state.puck)
-  useEffect(() => {
-    puckRef.current = state.puck
-  })
+  const { live, tryAimStart, aimUpdate, shoot } = controls
 
   // `paused` (settings/quit-confirm dialog open - see game.tsx) is only checked here, before
   // anything below has dispatched - safe to gate the whole chain on it at this single point
@@ -143,7 +138,8 @@ export function useAIOpponent(state: GameState, board: BoardLayout, aiPlayer: Pl
   // depending on it directly here would tear down and reschedule this effect's timers every ~16ms,
   // and the reaction delay below would never actually complete. Fix: depend on a derived PRIMITIVE
   // boolean instead (isInterceptEligible), which only flips value on a real false→true/true→false
-  // edge, not every frame the puck happens to still be moving.
+  // edge, not every frame the puck happens to still be moving. It reads the rendered puck, which is
+  // enough: a step that takes the puck across interceptThreshold renders (useGameState's `renders`).
   const speed = Math.hypot(state.puck.vx, state.puck.vy)
   const hasInterceptAim = state.interceptAim !== null
   // The `hasInterceptAim ||` term matters: without it, a gravity well transiently re-accelerating
@@ -168,10 +164,10 @@ export function useAIOpponent(state: GameState, board: BoardLayout, aiPlayer: Pl
       // little further (accepted, documented limitation - see PLAN); shot.fx/fy/power is a
       // direction/magnitude, not a target position, so the ACTUAL shot vector is unaffected either
       // way, only the cosmetic paddle-pullback target below.
-      const freshPuck: PuckState = puckRef.current
+      const freshPuck: PuckState = live().puck
       const shot = planAIShot(freshPuck, board, aiPlayer, difficulty, friction)
       if (controlScheme[aiPlayer] === 'stick') {
-        scheduleStickSwing(after, () => puckRef.current, shot.fx, shot.fy, shot.power, board, { tryAimStart, aimUpdate, shoot })
+        scheduleStickSwing(after, () => live().puck, shot.fx, shot.fy, shot.power, board, { tryAimStart, aimUpdate, shoot })
         return
       }
       const dragMag = shot.power * MAX_STICK_PULLBACK_PIXELS
@@ -183,13 +179,13 @@ export function useAIOpponent(state: GameState, board: BoardLayout, aiPlayer: Pl
       const velY = sign * shot.fy * velMag
 
       if (!tryAimStart(freshPuck.x, freshPuck.y)) return
-      after(WINDUP_STEP_MS, () => aimUpdate(puckRef.current.x + dragX * 0.55, puckRef.current.y + dragY * 0.55, velX, velY))
-      after(WINDUP_STEP_MS * 2, () => aimUpdate(puckRef.current.x + dragX, puckRef.current.y + dragY, velX, velY))
+      after(WINDUP_STEP_MS, () => aimUpdate(live().puck.x + dragX * 0.55, live().puck.y + dragY * 0.55, velX, velY))
+      after(WINDUP_STEP_MS * 2, () => aimUpdate(live().puck.x + dragX, live().puck.y + dragY, velX, velY))
       after(WINDUP_STEP_MS * 2 + RELEASE_PAUSE_MS, () => shoot(dragX, dragY, velX, velY))
     })
 
     return () => {
       timers.forEach(clearTimeout)
     }
-  }, [isInterceptEligible, aiPlayer, difficulty, friction, controlScheme, board, tryAimStart, aimUpdate, shoot])
+  }, [isInterceptEligible, aiPlayer, difficulty, friction, controlScheme, board, live, tryAimStart, aimUpdate, shoot])
 }

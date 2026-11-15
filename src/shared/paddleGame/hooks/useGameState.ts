@@ -1,6 +1,7 @@
 import { useGameLoop } from '@tastic/core'
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
+import { changedBesides, useMotionReducer } from '@/shared/motion/useMotionReducer'
 import { BALL_SPEED_TIERS, PADDLE_VELOCITY_SMOOTHING_FRAMES, SERVE_PAUSE_MS, SOLO_LIVES } from '@/shared/paddleGame/constants/game'
 import { BallSpeedLevel, BallState, BoardLayout, Brick, GameMode, GameState, PaddleState, PaddleStates, Player } from '@/shared/paddleGame/types'
 import { buildSharedBrickField, buildSoloBrickField, centerBall, centerPaddle, clampPaddleY, servingBall } from '@/shared/paddleGame/utils/board'
@@ -267,36 +268,30 @@ export function makeReducer(scoreToWin: number, ballSpeedLevel: BallSpeedLevel, 
 // beat with it, until it turns false: the play screen holds it until every human player is touching
 // the screen (Jay, 2026-11-07: time to back out, and no ball served at nobody). A rally in progress
 // never stops for it.
-export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLevel: BallSpeedLevel, mode: GameMode, hasBricks: boolean, paused: boolean, serveHeld = false) {
-  // Mirrored every render so the stable useReducer wrapper below always dispatches through the
-  // latest settings-derived reducer, without needing to recreate useReducer itself (which would
-  // reset `state` back to its initializer whenever scoreToWin/ballSpeedLevel changed).
-  const reducerRef = useRef(makeReducer(scoreToWin, ballSpeedLevel, mode, hasBricks))
-  // An effect (no dependency array, so it reruns after every render) rather than a bare
-  // `.current =` assignment in the component body - matching BoxHockey's own identical reducerRef
-  // in its useGameState.ts: React may render a component more than once for a single commit (e.g.
-  // under StrictMode or a Suspense retry) without every one of those renders actually reaching the
-  // device, so a bare render-time write here could mirror in a stale/discarded reducer; an effect
-  // only fires once per real commit.
-  useEffect(() => {
-    reducerRef.current = makeReducer(scoreToWin, ballSpeedLevel, mode, hasBricks)
-  })
+// Drawn on the UI thread, in this order: the ball, player 1's paddle, player 2's.
+function positions(state: GameState): number[] {
+  return [state.ball.x, state.ball.y, state.paddles[1].x, state.paddles[1].y, state.paddles[2].x, state.paddles[2].y]
+}
 
+export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLevel: BallSpeedLevel, mode: GameMode, hasBricks: boolean, paused: boolean, serveHeld = false) {
+  // A tick that only moves the ball and paddles doesn't render: they're drawn on the UI thread from
+  // `drawn` (see useMotionReducer). Anything else a tick changes renders once the ball is drawn
+  // there (a point, a broken brick, a bounce's sound). A point or a lost life puts the ball back at
+  // rest for the next serve inside the same tick, so the drawing jumps there rather than gliding
+  // across the court. The reducer is made fresh every render, so settings changes reach the next
+  // action (useMotionReducer keeps the latest).
   const bricksActive = bricksActiveFor(mode, hasBricks)
-  const [state, dispatch] = useReducer(
-    // eslint-disable-next-line react-hooks/refs -- see reducerRef's own comment above; this wrapper is only ever invoked from dispatch (an event handler), never during render
-    (s: GameState, a: Action) => reducerRef.current(s, a),
-    board,
-    // Wrapped rather than passed bare: React's lazy-init calls this with exactly one argument
-    // (the board), but makeInitialState now also needs mode/bricksActive.
-    (b) => makeInitialState(b, mode, bricksActive)
-  )
+  const { state, live, dispatch, step, onStep, drawn } = useMotionReducer(makeReducer(scoreToWin, ballSpeedLevel, mode, hasBricks), () => makeInitialState(board, mode, bricksActive), {
+    positions,
+    renders: (prev: GameState, next: GameState) => changedBesides(prev, next, ['ball', 'paddles']),
+    jumps: (prev: GameState, next: GameState) => prev.scores !== next.scores || prev.lives !== next.lives
+  })
 
   const boardRef = useRef(board)
   // Mirrored every render so the physics rAF loop below always reads the current board layout
   // without needing it in that effect's own deps - an effect (no dependency array) rather than a
-  // bare render-time assignment, same reasoning as reducerRef's own comment above and matching
-  // BoxHockey's identical boardRef.
+  // bare render-time assignment (React may render more than once for a single commit, and only an
+  // effect runs once per real commit), matching BoxHockey's identical boardRef.
   useEffect(() => {
     boardRef.current = board
   })
@@ -319,9 +314,9 @@ export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLe
   // With bricks the loop runs while a serve waits too, so the paddles follow their players and the
   // ball rides on the server's (see TICK).
   const waitingOnPaddle = bricksActive && (state.phase === 'idle' || state.phase === 'pointScored')
-  useGameLoop((dt) => dispatch({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }), { enabled: (state.phase === 'live' || waitingOnPaddle) && !paused, maxDt: 2.5 })
+  useGameLoop((dt) => step({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }, dt), { enabled: (state.phase === 'live' || waitingOnPaddle) && !paused, maxDt: 2.5 })
 
-  // useReducer's lazy init (the `board` argument passed to useReducer above) only ever runs ONCE,
+  // The initial state (makeInitialState, above) is only ever made ONCE,
   // at this hook's very first mount - but `board` itself can change again at any later point too:
   // useSafeAreaInsets/useOrientationState both resolve asynchronously after game.tsx's
   // first paint, a live window resize can fire at any time, and rotating the device mid-rally
@@ -352,7 +347,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLe
       2: rescalePaddleY({ x: 0, y: paddleTargetsRef.current[2], vx: 0, vy: 0 }, prevBoard, board, 2).y
     }
     dispatch({ type: 'RESCALE', prevBoard, board })
-  }, [board])
+  }, [board, dispatch])
 
   // Owns the idle->live and pointScored->live pauses itself, rather than pushing timer bookkeeping
   // out to game.tsx - this is the game's own internal rhythm, not something the screen layer needs
@@ -369,12 +364,15 @@ export function useGameState(board: BoardLayout, scoreToWin: number, ballSpeedLe
       return () => clearTimeout(t)
     }
     return undefined
-  }, [state.phase, paused, serveHeld])
+  }, [state.phase, paused, serveHeld, dispatch])
 
-  const resetGame = useCallback((currentBoard: BoardLayout) => {
-    paddleTargetsRef.current = { 1: centerPaddle(currentBoard, 1).y, 2: centerPaddle(currentBoard, 2).y }
-    dispatch({ type: 'RESET', board: currentBoard })
-  }, [])
+  const resetGame = useCallback(
+    (currentBoard: BoardLayout) => {
+      paddleTargetsRef.current = { 1: centerPaddle(currentBoard, 1).y, 2: centerPaddle(currentBoard, 2).y }
+      dispatch({ type: 'RESET', board: currentBoard })
+    },
+    [dispatch]
+  )
 
-  return { state, setPaddleTarget, resetGame }
+  return { state, live, onStep, drawn, setPaddleTarget, resetGame }
 }

@@ -1,11 +1,12 @@
 import { useGameLoop } from '@tastic/core'
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { AIM_VELOCITY_SMOOTHING_ALPHA, CONTROL_SCHEME_SIGN, FACEOFF_GUESS_BONUS_MS, FACEOFF_MARGIN_MAX_MS, FACEOFF_REACTION_MAX_MS, MAX_FLICK_VELOCITY, MAX_SPEED, MAX_STICK_PULLBACK_PIXELS, MIN_FLICK_VELOCITY, MIN_SHOOT_DRAG, TRIPLE_TAP_CLASH_WINDOW_MS, TRIPLE_TAP_TAPS } from '@/games/boxhockey/constants/game'
 import { AimIndicator, BoardLayout, ControlScheme, FaceoffState, GameState, Player, PuckState, TipoffMode, TripleTapState } from '@/games/boxhockey/types'
 import { centerPuck, faceoffZoneCenter } from '@/games/boxhockey/utils/board'
 import { computeAimVector, stepPhysics } from '@/games/boxhockey/utils/physics'
 import { clampBladeToBoard, isBladeClear, resolveStickContact } from '@/games/boxhockey/utils/stick'
+import { changedBesides, useMotionReducer } from '@/shared/motion/useMotionReducer'
 
 type Action =
   | { type: 'AIM_START'; x: number; y: number }
@@ -720,21 +721,22 @@ export function makeReducer(scoreToWin: number, tipoffMode: TipoffMode, friction
   }
 }
 
-export function useGameState(board: BoardLayout, scoreToWin: number, tipoffMode: TipoffMode, friction: number, controlScheme: Record<Player, ControlScheme>, paused: boolean, interceptThreshold: number) {
-  // Mirrored every render so the stable useReducer wrapper below always dispatches through the
-  // latest settings-derived reducer, without needing to recreate useReducer itself (which would
-  // reset `state` back to its initializer whenever any of these settings changed).
-  const reducerRef = useRef(makeReducer(scoreToWin, tipoffMode, friction, controlScheme, interceptThreshold))
-  useEffect(() => {
-    reducerRef.current = makeReducer(scoreToWin, tipoffMode, friction, controlScheme, interceptThreshold)
-  })
+// Whether the puck is slow enough to grab (see GameState.interceptAim): the play screen and the CPU
+// work it out from the rendered puck, so a step that crosses it renders.
+function interceptable(puck: PuckState, interceptThreshold: number): boolean {
+  return Math.hypot(puck.vx, puck.vy) < interceptThreshold
+}
 
-  const [state, dispatch] = useReducer(
-    // eslint-disable-next-line react-hooks/refs -- see reducerRef's own comment above; only ever invoked from dispatch, never during render
-    (s: GameState, a: Action) => reducerRef.current(s, a),
-    { board, scoreToWin, tipoffMode },
-    (init) => makeInitialState(init.board, init.tipoffMode, randomPlayer(), randomZoneIndex(), randomFaceoffZones(), randomReadyGuess())
-  )
+export function useGameState(board: BoardLayout, scoreToWin: number, tipoffMode: TipoffMode, friction: number, controlScheme: Record<Player, ControlScheme>, paused: boolean, interceptThreshold: number) {
+  // A step that only moves the puck doesn't render: it's drawn on the UI thread from `drawn` (see
+  // useMotionReducer). Anything else a step changes renders once the puck is drawn there: phase,
+  // the bounce/well/door counters (sounds and flashes), a mid-slide intercept's drag (interceptAim,
+  // every step while one is under way) and the puck slowing enough to grab. The reducer is made
+  // fresh every render, so settings changes reach the next action (useMotionReducer keeps the latest).
+  const { state, live, dispatch, step, drawn } = useMotionReducer(makeReducer(scoreToWin, tipoffMode, friction, controlScheme, interceptThreshold), () => makeInitialState(board, tipoffMode, randomPlayer(), randomZoneIndex(), randomFaceoffZones(), randomReadyGuess()), {
+    positions: (s: GameState) => [s.puck.x, s.puck.y],
+    renders: (prev: GameState, next: GameState) => changedBesides(prev, next, ['puck']) || interceptable(prev.puck, interceptThreshold) !== interceptable(next.puck, interceptThreshold)
+  })
 
   const boardRef = useRef(board)
   useEffect(() => {
@@ -757,7 +759,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, tipoffMode:
   // time-jump from however long the dialog was open.
   // Also enabled during 'striking' (not just 'simulating') - the puck must keep gliding through a
   // pull/push windup exactly the way it does the rest of the time; see PHYSICS_STEP's own comment.
-  useGameLoop((dt) => dispatch({ type: 'PHYSICS_STEP', board: boardRef.current, dt, interceptTouch: interceptTouchRef.current }), { enabled: (state.phase === 'simulating' || state.phase === 'striking') && !paused, maxDt: 2.5 })
+  useGameLoop((dt) => step({ type: 'PHYSICS_STEP', board: boardRef.current, dt, interceptTouch: interceptTouchRef.current }, dt), { enabled: (state.phase === 'simulating' || state.phase === 'striking') && !paused, maxDt: 2.5 })
 
   // See interceptTouchRef's own doc comment - called from game.tsx's stableAimUpdate INSTEAD of
   // dispatching AIM_UPDATE while an intercept is in progress. A plain synchronous ref write is
@@ -773,23 +775,29 @@ export function useGameState(board: BoardLayout, scoreToWin: number, tipoffMode:
   // rather than at the raw touch point, so it still reads as "pulling back from the puck"
   // regardless of where the finger actually landed. Kept returning a boolean (always true) to
   // avoid touching the tryAimStart/AIControls call-site contract.
-  const tryAimStart = useCallback((touchX: number, touchY: number) => {
-    // A new gesture never inherits the last one's finger: without this, an intercept's first
-    // physics step would fold in wherever the previous drag (often the shooter's own) left off,
-    // until this drag's first update - for a 'stick' interceptor, a bogus swing across the board.
-    interceptTouchRef.current = null
-    dispatch({ type: 'AIM_START', x: touchX, y: touchY })
-    return true
-  }, [])
+  const tryAimStart = useCallback(
+    (touchX: number, touchY: number) => {
+      // A new gesture never inherits the last one's finger: without this, an intercept's first
+      // physics step would fold in wherever the previous drag (often the shooter's own) left off,
+      // until this drag's first update - for a 'stick' interceptor, a bogus swing across the board.
+      interceptTouchRef.current = null
+      dispatch({ type: 'AIM_START', x: touchX, y: touchY })
+      return true
+    },
+    [dispatch]
+  )
 
   // Carries the live board for a 'stick' swing (see stickSwing), the same boardRef PHYSICS_STEP reads.
-  const aimUpdate = useCallback((x: number, y: number, vx: number, vy: number) => {
-    dispatch({ type: 'AIM_UPDATE', x, y, vx, vy, board: boardRef.current })
-  }, [])
+  const aimUpdate = useCallback(
+    (x: number, y: number, vx: number, vy: number) => {
+      dispatch({ type: 'AIM_UPDATE', x, y, vx, vy, board: boardRef.current })
+    },
+    [dispatch]
+  )
 
   const aimCancel = useCallback(() => {
     dispatch({ type: 'AIM_CANCEL' })
-  }, [])
+  }, [dispatch])
 
   // dx/dy is the raw drag (release position minus start position); vx/vy is the raw release
   // velocity. Both are passed through unsigned and un-gated - the STRIKE case (via
@@ -797,74 +805,107 @@ export function useGameState(board: BoardLayout, scoreToWin: number, tipoffMode:
   // AND decides which of the two ends up mattering (distance for 'pull'/'push', velocity for
   // 'flick'), since that decision needs to know whose turn it really is (the shooter, or an
   // in-progress interceptor) - see STRIKE's own comment for why that can't be resolved out here.
-  const shoot = useCallback((dx: number, dy: number, vx: number, vy: number) => {
-    dispatch({ type: 'STRIKE', dx, dy, vx, vy })
-  }, [])
+  const shoot = useCallback(
+    (dx: number, dy: number, vx: number, vy: number) => {
+      dispatch({ type: 'STRIKE', dx, dy, vx, vy })
+    },
+    [dispatch]
+  )
 
   const applyStrike = useCallback(() => {
     dispatch({ type: 'APPLY_STRIKE' })
-  }, [])
+  }, [dispatch])
 
-  const nextRound = useCallback((currentBoard: BoardLayout) => {
-    dispatch({ type: 'NEXT_ROUND', board: currentBoard, zoneIndex: randomZoneIndex(), faceoffZones: randomFaceoffZones(), faceoffReadyGuess: randomReadyGuess() })
-  }, [])
+  const nextRound = useCallback(
+    (currentBoard: BoardLayout) => {
+      dispatch({ type: 'NEXT_ROUND', board: currentBoard, zoneIndex: randomZoneIndex(), faceoffZones: randomFaceoffZones(), faceoffReadyGuess: randomReadyGuess() })
+    },
+    [dispatch]
+  )
 
   // No longer explicitly cancels the RAF loop before dispatching - useGameLoop's own effect does
   // that as soon as `enabled` (derived from state.phase) goes false on the next render, and the
   // reducer's PHYSICS_STEP case already no-ops outright once phase isn't 'simulating' (see above),
   // so a stray in-flight tick from the old loop instance can't apply against the reset state either
   // way - this was belt-and-suspenders on top of that guard, not the only thing preventing it.
-  const resetGame = useCallback((currentBoard: BoardLayout) => {
-    dispatch({ type: 'RESET', board: currentBoard, coinFlipWinner: randomPlayer(), zoneIndex: randomZoneIndex(), faceoffZones: randomFaceoffZones(), faceoffReadyGuess: randomReadyGuess() })
-  }, [])
+  const resetGame = useCallback(
+    (currentBoard: BoardLayout) => {
+      dispatch({ type: 'RESET', board: currentBoard, coinFlipWinner: randomPlayer(), zoneIndex: randomZoneIndex(), faceoffZones: randomFaceoffZones(), faceoffReadyGuess: randomReadyGuess() })
+    },
+    [dispatch]
+  )
 
   const coinFlipDone = useCallback(() => {
     dispatch({ type: 'COIN_FLIP_DONE' })
-  }, [])
+  }, [dispatch])
 
-  const faceoffCount = useCallback((count: 2 | 1) => {
-    dispatch({ type: 'FACEOFF_COUNT', count })
-  }, [])
+  const faceoffCount = useCallback(
+    (count: 2 | 1) => {
+      dispatch({ type: 'FACEOFF_COUNT', count })
+    },
+    [dispatch]
+  )
 
-  const faceoffHold = useCallback((goAt: number) => {
-    dispatch({ type: 'FACEOFF_HOLD', goAt })
-  }, [])
+  const faceoffHold = useCallback(
+    (goAt: number) => {
+      dispatch({ type: 'FACEOFF_HOLD', goAt })
+    },
+    [dispatch]
+  )
 
   const faceoffLive = useCallback(() => {
     dispatch({ type: 'FACEOFF_LIVE' })
-  }, [])
+  }, [dispatch])
 
-  const faceoffReady = useCallback((player: Player) => {
-    dispatch({ type: 'FACEOFF_READY', player })
-  }, [])
+  const faceoffReady = useCallback(
+    (player: Player) => {
+      dispatch({ type: 'FACEOFF_READY', player })
+    },
+    [dispatch]
+  )
 
-  const faceoffTap = useCallback((player: Player, atMs: number, zoneIndex: 0 | 1) => {
-    dispatch({ type: 'FACEOFF_TAP', player, atMs, zoneIndex })
-  }, [])
+  const faceoffTap = useCallback(
+    (player: Player, atMs: number, zoneIndex: 0 | 1) => {
+      dispatch({ type: 'FACEOFF_TAP', player, atMs, zoneIndex })
+    },
+    [dispatch]
+  )
 
-  const faceoffTimeout = useCallback((player: Player) => {
-    dispatch({ type: 'FACEOFF_TIMEOUT', player })
-  }, [])
+  const faceoffTimeout = useCallback(
+    (player: Player) => {
+      dispatch({ type: 'FACEOFF_TIMEOUT', player })
+    },
+    [dispatch]
+  )
 
-  const faceoffLaunch = useCallback((vx: number, vy: number) => {
-    dispatch({ type: 'FACEOFF_LAUNCH', vx, vy })
-  }, [])
+  const faceoffLaunch = useCallback(
+    (vx: number, vy: number) => {
+      dispatch({ type: 'FACEOFF_LAUNCH', vx, vy })
+    },
+    [dispatch]
+  )
 
   const faceoffRestart = useCallback(() => {
     dispatch({ type: 'FACEOFF_RESTART' })
-  }, [])
+  }, [dispatch])
 
-  const tripleTapPress = useCallback((player: Player, atMs: number) => {
-    dispatch({ type: 'TRIPLE_TAP_PRESS', player, atMs })
-  }, [])
+  const tripleTapPress = useCallback(
+    (player: Player, atMs: number) => {
+      dispatch({ type: 'TRIPLE_TAP_PRESS', player, atMs })
+    },
+    [dispatch]
+  )
 
-  const tripleTapSwipe = useCallback((player: Player, dx: number, dy: number, vx: number, vy: number, atMs: number) => {
-    dispatch({ type: 'TRIPLE_TAP_SWIPE', player, dx, dy, vx, vy, atMs })
-  }, [])
+  const tripleTapSwipe = useCallback(
+    (player: Player, dx: number, dy: number, vx: number, vy: number, atMs: number) => {
+      dispatch({ type: 'TRIPLE_TAP_SWIPE', player, dx, dy, vx, vy, atMs })
+    },
+    [dispatch]
+  )
 
   const tripleTapClashEnd = useCallback(() => {
     dispatch({ type: 'TRIPLE_TAP_CLASH_END' })
-  }, [])
+  }, [dispatch])
 
-  return { state, tryAimStart, aimUpdate, aimCancel, shoot, applyStrike, nextRound, resetGame, coinFlipDone, faceoffCount, faceoffHold, faceoffLive, faceoffReady, faceoffTap, faceoffTimeout, faceoffLaunch, faceoffRestart, tripleTapPress, tripleTapSwipe, tripleTapClashEnd, setInterceptTouch }
+  return { state, live, drawn, tryAimStart, aimUpdate, aimCancel, shoot, applyStrike, nextRound, resetGame, coinFlipDone, faceoffCount, faceoffHold, faceoffLive, faceoffReady, faceoffTap, faceoffTimeout, faceoffLaunch, faceoffRestart, tripleTapPress, tripleTapSwipe, tripleTapClashEnd, setInterceptTouch }
 }

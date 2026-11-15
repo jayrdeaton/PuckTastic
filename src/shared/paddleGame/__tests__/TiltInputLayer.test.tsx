@@ -36,7 +36,7 @@ beforeEach(() => {
 
 async function renderLayer(rotation: 0 | -90 = -90) {
   const onPaddleTargetY = jest.fn()
-  const result = await render(<TiltInputLayer player={1} enabled phase='live' rotation={rotation} board={board} paddleY={100} onPaddleTargetY={onPaddleTargetY} />)
+  const result = await render(<TiltInputLayer player={1} enabled phase='live' rotation={rotation} board={board} paddleY={() => 100} onPaddleTargetY={onPaddleTargetY} />)
   return { onPaddleTargetY, ...result }
 }
 

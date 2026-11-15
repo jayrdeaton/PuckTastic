@@ -6,7 +6,7 @@ import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { humanSeatsFor, liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useBackBlock, useProfiles } from '@tastic/shell'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -152,8 +152,10 @@ export default function GameScreen() {
   useKeepAwake('game')
   const paused = settingsOpen || confirmVisible || backgroundPaused
 
-  const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
-  const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide, puckInPlay } = state
+  const { state, live, onStep, drawn, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
+  const { phase, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide, puckInPlay } = state
+  // The keyboard's baseline: where the paddles are now, not at the last render (see KeyboardInputLayer).
+  const livePaddles = useCallback(() => live().paddles, [live])
   // Mirrored for useQuitConfirmation's getter above, which can't read phase and scores directly:
   // react-hooks/immutability flags reading a binding before its own declaration, even in a closure
   // only ever invoked later. Effect-based, as vibrationRef/soundRef are, so requestBack reads the
@@ -187,7 +189,7 @@ export default function GameScreen() {
     if (phase === 'live') clearToasts()
   }, [phase, clearToasts])
 
-  useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
+  useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget, onStep)
 
   // The rink's desktop shape (a fixed ratio with drawn walls, a browser window at least
   // DESKTOP_WEB_MIN_WIDTH wide): mirrors utils/board.ts's isDesktopLayout, so it's the window's width,
@@ -316,7 +318,7 @@ export default function GameScreen() {
           player 1 (local bottom) on the screen's RIGHT, '-90deg' puts them on the LEFT. */}
       <View style={[styles.viewport, { width, height }]}>
         <View style={[styles.localContainer, { width: localSize.width, height: localSize.height }, rotationDeg !== 0 && { transform: [{ rotate: `${rotationDeg}deg` }] }]}>
-          <Board board={board} puck={puck} paddles={paddles} phase={phase} scores={scores} scoreToWin={scoreToWin} lastScoredGoal={lastScoredGoal} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} showWalls={desktopBoard} />
+          <Board board={board} drawn={drawn} phase={phase} scores={scores} scoreToWin={scoreToWin} lastScoredGoal={lastScoredGoal} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} showWalls={desktopBoard} />
           {/* Zones themselves still live inside this same rotated container - DOM/native hit-
               testing needs their rotated screen footprint to correctly decide WHICH zone a touch
               landed on; only the resulting coordinate VALUE (screenToLocal, using
@@ -326,10 +328,9 @@ export default function GameScreen() {
       </View>
 
       {/* Web-only, additive keyboard input - see that component's own doc for why it needs no
-      rotation-awareness the way TouchInputLayer does. paddles[1]/paddles[2] are read fresh every
-      frame internally (not reactively), so passing the current `paddles` snapshot here on every
-      render is exactly right, not stale. */}
-      <KeyboardInputLayer enabled={!paused} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddlePos={{ 1: paddles[1], 2: paddles[2] }} onPaddleTarget={setPaddleTarget} />
+      rotation-awareness the way TouchInputLayer does. It reads the paddles' live positions every
+      frame (livePaddles), since a tick that only moves them doesn't render. */}
+      <KeyboardInputLayer enabled={!paused} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddlePos={livePaddles} onPaddleTarget={setPaddleTarget} />
 
       {/* Game Over overlay - upright whatever the rink's turn.
           2 Player gets one card per seat instead, each in that player's half and turned to face

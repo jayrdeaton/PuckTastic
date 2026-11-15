@@ -1,10 +1,11 @@
 import { useGameLoop } from '@tastic/core'
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { GOAL_SERVE_PAUSE_MS, PADDLE_VELOCITY_SMOOTHING_FRAMES } from '@/games/airhockey/constants/game'
 import { BoardLayout, GameState, GoalSide, PaddleState, Player, PuckState } from '@/games/airhockey/types'
 import { centerPaddle, centerPuck, clampToOwnHalf, faceoffZoneCenter } from '@/games/airhockey/utils/board'
 import { applyPaddleCollision, clampPaddleSpeed, computePaddleVelocity, stepPhysics } from '@/games/airhockey/utils/physics'
+import { changedBesides, useMotionReducer } from '@/shared/motion/useMotionReducer'
 
 type PaddleTargets = Record<Player, { x: number; y: number }>
 
@@ -176,12 +177,22 @@ export function makeReducer(scoreToWin: number, friction: number) {
   }
 }
 
+// Drawn on the UI thread, in this order: the puck, player 1's paddle, player 2's.
+function positions(state: GameState): number[] {
+  return [state.puck.x, state.puck.y, state.paddles[1].x, state.paddles[1].y, state.paddles[2].x, state.paddles[2].y]
+}
+
 export function useGameState(board: BoardLayout, scoreToWin: number, friction: number, paused: boolean) {
-  // Passing a freshly-made reducer on every render (rather than memoizing it) is safe and
-  // intentional: React always uses the CURRENT render's reducer argument to process any pending
-  // dispatch, and dispatch's own identity stays stable regardless - so scoreToWin/friction changes
-  // are picked up immediately, with no stale-closure ref indirection needed.
-  const [state, dispatch] = useReducer(makeReducer(scoreToWin, friction), board, makeInitialState)
+  // A tick that only moves the puck and paddles doesn't render: they're drawn on the UI thread from
+  // `drawn` (see useMotionReducer). Anything else a tick changes renders once the puck is drawn
+  // there (a goal, a bounce's sound, a door flash, the puck first going into play). A stranded puck
+  // re-served from inside a tick (TICK's 'idle' branch) jumps to its spot rather than gliding there.
+  // The reducer is made fresh every render, so scoreToWin/friction changes reach the next action.
+  const { state, live, dispatch, step, onStep, drawn } = useMotionReducer(makeReducer(scoreToWin, friction), () => makeInitialState(board), {
+    positions,
+    renders: (prev: GameState, next: GameState) => changedBesides(prev, next, ['puck', 'paddles']),
+    jumps: (prev: GameState, next: GameState) => prev.phase === 'live' && next.phase === 'idle'
+  })
 
   const boardRef = useRef(board)
   useEffect(() => {
@@ -201,9 +212,9 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
     paddleTargetsRef.current = { ...paddleTargetsRef.current, [player]: clamped }
   }, [])
 
-  useGameLoop((dt) => dispatch({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }), { enabled: state.phase === 'live' && !paused, maxDt: 2.5 })
+  useGameLoop((dt) => step({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }, dt), { enabled: state.phase === 'live' && !paused, maxDt: 2.5 })
 
-  // useReducer's lazy init (the `board` argument passed to useReducer below) only ever runs ONCE,
+  // The initial state (makeInitialState(board), above) is only ever made ONCE,
   // at this hook's very first mount - but `board` itself can change again at any later point too:
   // useSafeAreaInsets/useOrientationState both resolve asynchronously after game.tsx's first paint, a
   // live window resize can fire at any time, and rotating the device mid-rally genuinely changes
@@ -229,7 +240,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
     }
     paddleTargetsRef.current = { 1: rescalePoint({ ...paddleTargetsRef.current[1], vx: 0, vy: 0 }, prevBoard, board), 2: rescalePoint({ ...paddleTargetsRef.current[2], vx: 0, vy: 0 }, prevBoard, board) }
     dispatch({ type: 'RESCALE', prevBoard, board })
-  }, [board])
+  }, [board, dispatch])
 
   // Owns the idle->live and goalScored->live pauses itself, rather than pushing timer bookkeeping
   // out to game.tsx - this is the game's own internal rhythm, not something the screen layer
@@ -246,12 +257,15 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
       return () => clearTimeout(t)
     }
     return undefined
-  }, [state.phase, paused])
+  }, [state.phase, paused, dispatch])
 
-  const resetGame = useCallback((currentBoard: BoardLayout) => {
-    paddleTargetsRef.current = { 1: centerPaddle(currentBoard, 1), 2: centerPaddle(currentBoard, 2) }
-    dispatch({ type: 'RESET', board: currentBoard })
-  }, [])
+  const resetGame = useCallback(
+    (currentBoard: BoardLayout) => {
+      paddleTargetsRef.current = { 1: centerPaddle(currentBoard, 1), 2: centerPaddle(currentBoard, 2) }
+      dispatch({ type: 'RESET', board: currentBoard })
+    },
+    [dispatch]
+  )
 
-  return { state, setPaddleTarget, resetGame }
+  return { state, live, onStep, drawn, setPaddleTarget, resetGame }
 }

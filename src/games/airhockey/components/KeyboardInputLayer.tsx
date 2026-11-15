@@ -10,10 +10,10 @@ export interface KeyboardInputLayerProps {
   enabled: boolean
   humanPlayers: Player[]
   controlScheme: Record<Player, ControlScheme>
-  // Each player's CURRENT paddle position, read fresh every frame (via the ref below) as the
-  // baseline held keys nudge from - NOT a live prop this component reacts to render-to-render, the
-  // same way TouchInputLayer's own onPaddleTarget calls never wait for a render either.
-  paddlePos: Record<Player, { x: number; y: number }>
+  // Each player's CURRENT paddle position (the live state's, useGameState's `live`), read every
+  // frame as the baseline held keys nudge from. A getter, not a prop: a physics tick that only moves
+  // the paddles doesn't render (see useMotionReducer), so a rendered position would be stale.
+  paddlePos: () => Record<Player, { x: number; y: number }>
   onPaddleTarget: (player: Player, x: number, y: number) => void
 }
 
@@ -141,7 +141,7 @@ export default function KeyboardInputLayer({ enabled, humanPlayers, controlSchem
           axisX *= DIAGONAL_SCALE
           axisY *= DIAGONAL_SCALE
         }
-        const pos = paddlePos[player]
+        const pos = paddlePos()[player]
         onPaddleTarget(player, pos.x + axisX * MAX_PADDLE_SPEED * dt, pos.y + axisY * MAX_PADDLE_SPEED * dt)
       }
 

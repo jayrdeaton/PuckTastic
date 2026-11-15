@@ -5,11 +5,12 @@ import { FaceoffCircle, GoalDoorFlash, ScoreWedges, ZoneLine } from '@tastic/spr
 import { CelebrationRings, Disc, GoalPost, ObstacleRect } from '@tastic/sprites/shapes'
 import { useEffect, useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { cancelAnimation, Easing, useDerivedValue, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
+import { cancelAnimation, Easing, SharedValue, useDerivedValue, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 
 import { GOAL_LINE_STROKE_WIDTH } from '@/games/airhockey/constants/game'
-import { BoardLayout, GamePhase, GoalSide, PaddleStates, Player, PuckState } from '@/games/airhockey/types'
+import { BoardLayout, GamePhase, GoalSide, Player } from '@/games/airhockey/types'
 import { faceoffZoneCenters, faceoffZoneRadius } from '@/games/airhockey/utils/board'
+import { useDrawnPoint } from '@/shared/motion/useMotionReducer'
 
 // Flip to true locally to see the rink's true collision curve (corners + behind-goal pocket) while
 // tuning cornerRadius/behindGoalDepth in computeBoardLayout - off by default, same as BoxHockey's,
@@ -18,8 +19,10 @@ const SHOW_RINK_DEBUG_PERIMETER = false
 
 export interface BoardProps {
   board: BoardLayout
-  puck: PuckState
-  paddles: PaddleStates
+  // Where the puck and paddles are drawn, on the UI thread (useGameState's `drawn`: the puck, player
+  // 1's paddle, player 2's, [x, y] each). A tick that only moves them doesn't render (see
+  // useMotionReducer).
+  drawn: SharedValue<number[]>
   phase: GamePhase
   scores: [number, number]
   scoreToWin: number
@@ -36,7 +39,7 @@ export interface BoardProps {
   showWalls: boolean
 }
 
-export default function Board({ board, puck, paddles, phase, scores, scoreToWin, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, showWalls }: BoardProps) {
+export default function Board({ board, drawn, phase, scores, scoreToWin, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, showWalls }: BoardProps) {
   const { x, y, width, height, wallThickness, puckRadius, paddleRadius, goalStart, goalEnd, obstacles, goalPosts } = board
 
   const goalAbsLeft = x + goalStart
@@ -138,6 +141,11 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
 
   const paddleRingRadius = paddleRadius * 0.35
 
+  // Each moving piece is drawn at (0, 0) inside a Group that puts it where it's drawn now.
+  const puckTransform = useDrawnPoint(drawn, 0)
+  const p1Transform = useDrawnPoint(drawn, 1)
+  const p2Transform = useDrawnPoint(drawn, 2)
+
   // ─── Zone lines ─────────────────────────────────────────────────────────────
   // A rink's blue-line equivalent, ported from BoxHockey unchanged: a bold full-width bar, in
   // each player's own color, sitting further out than the goal crease but short of center - real
@@ -226,15 +234,21 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
         ))}
 
         {/* Paddles - a live, finger-controlled disc (unlike BoxHockey's swing-animated stick):
-            position is driven directly by state.paddles[player] every tick, no aim/swing state to
-            preview. A smaller, lighter inner ring gives it a "mallet knob" read. */}
-        <Circle cx={paddles[1].x} cy={paddles[1].y} r={paddleRadius} color={p1Color} />
-        <Circle cx={paddles[1].x} cy={paddles[1].y} r={paddleRingRadius} style='stroke' strokeWidth={2.5} color='#FFFFFF' />
-        <Circle cx={paddles[2].x} cy={paddles[2].y} r={paddleRadius} color={p2Color} />
-        <Circle cx={paddles[2].x} cy={paddles[2].y} r={paddleRingRadius} style='stroke' strokeWidth={2.5} color='#FFFFFF' />
+            position follows each tick's committed paddle, no aim/swing state to preview. A smaller,
+            lighter inner ring gives it a "mallet knob" read. */}
+        <Group transform={p1Transform}>
+          <Circle cx={0} cy={0} r={paddleRadius} color={p1Color} />
+          <Circle cx={0} cy={0} r={paddleRingRadius} style='stroke' strokeWidth={2.5} color='#FFFFFF' />
+        </Group>
+        <Group transform={p2Transform}>
+          <Circle cx={0} cy={0} r={paddleRadius} color={p2Color} />
+          <Circle cx={0} cy={0} r={paddleRingRadius} style='stroke' strokeWidth={2.5} color='#FFFFFF' />
+        </Group>
 
         {/* Puck - flat black fill + a white ring that softly breathes while waiting to go live. */}
-        <Disc x={puck.x} y={puck.y} radius={puckRadius} color='#000000' ringColor='#FFFFFF' ringOpacity={ringOpacity} />
+        <Group transform={puckTransform}>
+          <Disc x={0} y={0} radius={puckRadius} color='#000000' ringColor='#FFFFFF' ringOpacity={ringOpacity} />
+        </Group>
 
         {/* Celebration rings */}
         {lastScoredGoal !== null && <CelebrationRings x={goalCX} y={celebCY} color={celebColor} baseRadius={puckRadius} maxExpansionRadius={board.goalWidth * 0.85} triggerKey={lastScoredGoal} />}
