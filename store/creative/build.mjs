@@ -4,8 +4,9 @@
 // real geometry and colors: computeBoardLayout on the iPhone 17 Pro Max layout (the screenshots' device), Classic,
 // medium puck, Rink off, faceoffZoneCenters/faceoffZoneRadius for the circles, computeGoalWedges for the score arcs,
 // and the dark theme's colors (the pack's seatColors from src/pack.ts, Board's white walls and 25% white lines). The
-// puck's flight is a real shot played out frame by frame on the app's own stepPhysics. The search art's phone shows
-// Home's screenshot capture, the four games (store/screenshots/raw/iphone/02-home.png, so take the screenshots first).
+// puck's flight is a real shot played out frame by frame on the app's own stepPhysics. The search art fans the four
+// games' screenshot captures out in phones (store/screenshots/raw/iphone/01-boxhockey, 03-airhockey, 04-paddles and
+// 05-breaker, so take the screenshots first).
 //
 //   node store/creative/build.mjs
 //
@@ -26,7 +27,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(HERE, '../..')
 const OUT_DIR = path.join(ROOT, 'store', 'screenshots')
 const CREATIVE = process.env.CREATIVE ?? path.join(os.homedir(), '.claude/skills/app-store-prep/scripts/creative.mjs')
-const CAPTURE = path.join(OUT_DIR, 'raw', 'iphone', '02-home.png')
 // The screenshots' caption font (store/screenshots.json), the closest file to the app's Menlo.
 const FONT = '/System/Library/Fonts/SFNSMono.ttf'
 
@@ -203,35 +203,28 @@ ${puckAt(frame, 8, 3)}
   const featureW = Math.round((1646 * 1024) / 500)
   const featureFile = page('feature', 1024, 500, `<svg width="1024" height="500" viewBox="${(3840 - featureW) / 2} 0 ${featureW} 1646" xmlns="http://www.w3.org/2000/svg">${featureArt}</svg>`)
 
-  // Search results, 3840 x 2560: state the obvious. The headline on the left and Home's four games on the right. The
-  // iPhone's search card shows only the top of the image (the full width, y 0 to about 1500, in App Store Connect's
-  // Device Preview, measured for SlingScan), so the words are centered in that strip and the phone is sized and placed
-  // so Home's title and all four game rows, down to Breaker's (the capture's y 2316), sit above y 1470. Inside Apple's
-  // template safe area (y 765-1795) the subline fell below the strip. The iPad shows all of it.
-  const STRIP = 1500
-  const phoneScale = 0.6
-  const phoneW = 1320 * phoneScale
-  const phoneH = 2868 * phoneScale
-  const bezel = 22
-  const phoneLeft = 2100
-  const phoneTop = 80
-  const radius = 165 * phoneScale
+  // Search results, 3840 x 2560: state the obvious, and fill the card. iOS 27's search card shows the whole 3:2 on
+  // iPhone as on iPad, about 390pt wide on a phone (Jay's App Store screenshots, 2026-11-13; App Store Connect's preview
+  // cropping it to the top 1500 was the preview's bug), so ten pixels here are about a point there. The first version,
+  // kept to that strip and the template's middle (x 836-3004), read as mostly empty with a 15pt headline and Home's
+  // menu. Now the headline runs across the top at 240px, and under it the four games fan out in phones running off the
+  // bottom, in Home's order: Box Hockey, Air Hockey, Paddles and Breaker, on the app's black lit by the two seats'
+  // colors. Phones from the app-store-prep skill's phone.mjs.
+  const { fan } = await import(pathToFileURL(path.join(path.dirname(CREATIVE), 'phone.mjs')).href)
+  const SHOTS = ['01-boxhockey', '03-airhockey', '04-paddles', '05-breaker'].map((name) => path.join(OUT_DIR, 'raw', 'iphone', `${name}.png`))
+  const glow = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})`
   const searchFile = page(
     'search',
     3840,
     2560,
     `
-<div class="overlay" style="left:876px;top:0;width:1120px;height:${STRIP}px;display:flex;flex-direction:column;justify-content:center;gap:70px">
-  <div style="font-size:150px;line-height:1.12;font-weight:700">Four<br>Puck Games</div>
-  <div style="font-size:84px;line-height:1.3;font-weight:700;opacity:0.85">Play a Friend<br>or the CPU</div>
-  <div style="display:flex;gap:40px"><div style="width:220px;height:16px;border-radius:8px;background:${p1}"></div><div style="width:220px;height:16px;border-radius:8px;background:${p2}"></div></div>
+<div class="overlay" style="inset:0;background:radial-gradient(ellipse 1500px 1300px at 1100px 1750px, ${glow(p1, 0.2)} 0%, ${glow(p1, 0)} 100%), radial-gradient(ellipse 1500px 1300px at 2740px 1750px, ${glow(p2, 0.2)} 0%, ${glow(p2, 0)} 100%)"></div>
+<div class="overlay" style="left:0;right:0;top:160px;display:flex;flex-direction:column;align-items:center;gap:40px;text-align:center">
+  <div style="font-size:240px;line-height:1.05;font-weight:700;white-space:nowrap">Four Puck Games</div>
+  <div style="font-size:112px;line-height:1.15;font-weight:700;opacity:0.85;white-space:nowrap">Play a Friend or the CPU</div>
+  <div style="display:flex;gap:44px"><div style="width:260px;height:18px;border-radius:9px;background:${p1}"></div><div style="width:260px;height:18px;border-radius:9px;background:${p2}"></div></div>
 </div>
-<div class="overlay" style="left:${phoneLeft - bezel}px;top:${phoneTop - bezel}px;padding:${bezel}px;background:#0a0a0a;border-radius:${radius + bezel}px;box-shadow:0 0 0 4px rgba(255,255,255,0.16),0 50px 140px rgba(255,255,255,0.06)">
-  <div style="position:relative;width:${phoneW}px;height:${phoneH}px;border-radius:${radius}px;overflow:hidden">
-    <img src="${pathToFileURL(CAPTURE).href}" style="display:block;width:${phoneW}px;height:${phoneH}px">
-    <div style="position:absolute;left:${(phoneW - 378 * phoneScale) / 2}px;top:${41 * phoneScale}px;width:${378 * phoneScale}px;height:${111 * phoneScale}px;border-radius:${(111 * phoneScale) / 2}px;background:#000"></div>
-  </div>
-</div>`
+${fan(SHOTS, { top: 980, scale: 0.66, gap: -80, turn: 3, drop: 90, ring: 'rgba(255,255,255,0.2)', shadow: '0 40px 140px rgba(0,0,0,0.8)' })}`
   )
 
   fs.mkdirSync(path.join(OUT_DIR, 'google-play'), { recursive: true })

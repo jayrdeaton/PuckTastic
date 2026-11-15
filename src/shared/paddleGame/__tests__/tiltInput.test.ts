@@ -82,6 +82,58 @@ describe('computeTiltTargetY', () => {
     expect(other).toBeCloseTo(boardCenterY, 5)
   })
 
+  // What both platforms report for a hold, from the up vector in the device's frame (Android's
+  // getOrientation and iOS's CMAttitude alike): beta = asin(up.y), gamma = atan2(-up.x, up.z). The hold
+  // is given by how far the right edge dips (`dip`), how far the top edge is raised (`raise`), and
+  // whether the screen faces up (true) or has tipped past vertical (false). The two edges are square to
+  // each other, so a hold where both are steep doesn't exist.
+  function reported(dipDeg: number, raiseDeg: number, screenUp = true): { beta: number; gamma: number } {
+    const x = -Math.sin(deg(dipDeg))
+    const y = Math.sin(deg(raiseDeg))
+    if (x * x + y * y > 1) throw new Error(`no hold dips ${dipDeg} and raises ${raiseDeg}`)
+    const z = (screenUp ? 1 : -1) * Math.sqrt(1 - x * x - y * y)
+    return { beta: Math.asin(y), gamma: Math.atan2(-x, z) }
+  }
+
+  // Jay's Android, 2026-11-15: "the paddle goes to one side and then doesn't move at all anymore".
+  // gamma is an Euler roll, so a phone held upright to play (up.z near 0) swings it by tens of degrees
+  // on a tremor, and once the phone tips past vertical it jumps by 180.
+  it.each([0, 45, 70, 80, 82])('a phone raised %d degrees steers by how far its right edge dips', (raise) => {
+    const level = reported(0, raise)
+    const baseline = calibrateTiltBaseline(level.beta, level.gamma, boardCenterY, PORTRAIT)
+    const dipped = reported(TILT_DEAD_ZONE_DEG + 5, raise)
+    const y = computeTiltTargetY(dipped.beta, dipped.gamma, baseline, -90, paddleMinY, paddleMaxY)
+    expect(y - boardCenterY).toBeCloseTo((5 / (TILT_MAX_DEG - TILT_DEAD_ZONE_DEG)) * travelRadius, 5)
+    const otherWay = reported(-(TILT_DEAD_ZONE_DEG + 5), raise)
+    expect(computeTiltTargetY(otherWay.beta, otherWay.gamma, baseline, -90, paddleMinY, paddleMaxY) - boardCenterY).toBeCloseTo(-(y - boardCenterY), 5)
+  })
+
+  it('a calibration caught just past vertical leaves the paddle where it is once the phone is lowered, and it still steers both ways', () => {
+    const pastVertical = reported(0.5, 88, false)
+    const baseline = calibrateTiltBaseline(pastVertical.beta, pastVertical.gamma, boardCenterY, PORTRAIT)
+    const lowered = reported(0, 60)
+    expect(computeTiltTargetY(lowered.beta, lowered.gamma, baseline, -90, paddleMinY, paddleMaxY)).toBeCloseTo(boardCenterY, 5)
+    const right = reported(TILT_MAX_DEG, 60)
+    const left = reported(-TILT_MAX_DEG, 60)
+    expect(computeTiltTargetY(right.beta, right.gamma, baseline, -90, paddleMinY, paddleMaxY)).toBeGreaterThan(boardCenterY + travelRadius * 0.9)
+    expect(computeTiltTargetY(left.beta, left.gamma, baseline, -90, paddleMinY, paddleMaxY)).toBeLessThan(boardCenterY - travelRadius * 0.9)
+  })
+
+  it('tipping the phone back and forth through vertical, held level, never moves the paddle', () => {
+    const start = reported(0, 75)
+    const baseline = calibrateTiltBaseline(start.beta, start.gamma, boardCenterY, PORTRAIT)
+    for (const [raise, screenUp] of [
+      [85, true],
+      [89.5, true],
+      [89.5, false],
+      [80, false],
+      [70, true]
+    ] as const) {
+      const now = reported(0.2, raise, screenUp)
+      expect(computeTiltTargetY(now.beta, now.gamma, baseline, -90, paddleMinY, paddleMaxY)).toBeCloseTo(boardCenterY, 5)
+    }
+  })
+
   it('scales linearly with the travel range', () => {
     const baseline = calibrateTiltBaseline(0, 0, boardCenterY, PORTRAIT)
     const halfway = computeTiltTargetY(deg(TILT_DEAD_ZONE_DEG + (TILT_MAX_DEG - TILT_DEAD_ZONE_DEG) / 2), 0, baseline, 0, paddleMinY, paddleMaxY)
