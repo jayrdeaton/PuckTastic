@@ -62,10 +62,9 @@ export interface Brick {
 // Single source of truth for court geometry, always expressed in canonical LOCAL space: player 1
 // is always at local-left, player 2 always at local-right, the ball always travels along the
 // local X axis - regardless of how the device is physically held. Unlike AirHockey's BoardLayout,
-// there is no GoalAxis/rotation field here at all: the rendering layer (game.tsx) is solely
-// responsible for rotating this local rectangle onto the real screen via @tastic/split-screen's
-// getFixedZoneRotation (see the design spec's board.ts section), so board/physics/AI code never
-// needs to branch on real device orientation.
+// there is no GoalAxis/rotation field here at all: the rendering layer (the play screen) is solely
+// responsible for turning this local rectangle onto the real screen (-90 in a tall window, 0 in a
+// wide one), so board/physics/AI code never needs to branch on the window's shape.
 export interface BoardLayout {
   x: number
   y: number

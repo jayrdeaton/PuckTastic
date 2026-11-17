@@ -20,10 +20,9 @@ export function computeViewportSize(screenWidth: number, screenHeight: number, i
 
 // No goalAxis/rotation parameter at all - unlike AirHockey's computeBoardLayout, board/physics/AI
 // stay in canonical local space always (paddles at local-left/local-right, ball travels along
-// local X). The rendering layer (game.tsx) is what rotates this local space onto the real screen
-// via @tastic/split-screen's getFixedZoneRotation - see the design spec's note below - this
-// function never needs to know about real device orientation; game.tsx alone decides which real
-// width/height to feed it based on the live orientationMode.
+// local X). The rendering layer (the play screen) is what turns this local space onto the real
+// screen - see the note below - so this function never needs to know the window's shape; the play
+// screen alone decides which real width/height to feed it based on the live orientationMode.
 // desktop: whether the court takes its computer shape. The play screen passes its own check (the
 // window's width), since it hands this a turned court's length as its width: a phone browser's 812pt
 // screen height passed DESKTOP_WEB_MIN_WIDTH and got the letterboxed computer court without its walls.
@@ -125,11 +124,10 @@ export function buildSharedBrickField(board: BoardLayout): Brick[] {
   return packBrickRows(board.centerX - halfDepth, board.y + margin, board.centerX + halfDepth, board.y + board.height - margin, SHARED_BRICK_ROWS, SHARED_BRICKS_PER_ROW, gap)
 }
 
-// NOTE on the orientation layer built on top of this (see the plan file + BoxHockey source for
-// exact @tastic/split-screen usage): when the live orientationMode is 'sideBySide', local space
-// maps directly onto the screen (width=local width, height=local height, screenWidth/screenHeight
-// passed straight through). When 'faceToFace', the container hosting the board+TouchInputLayer
-// tree is rotated 90°/-90° via getFixedZoneRotation, and computeBoardLayout must be called with
+// NOTE on the orientation layer built on top of this: when the live orientationMode is
+// 'sideBySide', local space maps directly onto the screen (width=local width, height=local height,
+// screenWidth/screenHeight passed straight through). When 'faceToFace', the container hosting the
+// board+TouchInputLayer tree is turned -90°, and computeBoardLayout must be called with
 // the SWAPPED dimensions (screenHeight passed as screenWidth and vice versa) so the local rect
 // still comes out sized correctly for its own rotated container - mirrors AirHockey's original
 // computeLocalContainerSize's short/long swap, just resolved one level up in game.tsx rather than

@@ -17,9 +17,8 @@ export interface TouchInputLayerProps {
   // to convert a touch's real screen position back into the local Y board.ts's paddleMinY/paddleMaxY
   // already assume - see screenToLocalY below.
   containerHeight: number
-  // The SAME rotation game.tsx applies to the board's own container (0 for sideBySide, ±90 for
-  // faceToFace - see game.tsx's own doc comment on why this is the mirror image of
-  // @tastic/split-screen's own getFixedZoneRotation/getViewRotation convention). Needed to invert a
+  // The SAME rotation the play screen applies to the board's own container (0 in a wide window,
+  // -90 in a tall one - see PlayScreen's own comment on the court's turn). Needed to invert a
   // touch's real e.absoluteX/absoluteY back into this same local space by hand, since RNGH does not
   // correct for an ancestor View's rotation on its own.
   rotation: 0 | 90 | -90
