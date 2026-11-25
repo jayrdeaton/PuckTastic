@@ -20,6 +20,9 @@ export const pack: PackDefinition = {
   wordmark: ['PUCK', 'TASTIC'],
   colorCaption: 'PuckTastic only',
   games,
+  // Every game opens a setup screen with the player picker first (Jay, 2026-11-25, as CardTastic and
+  // AlphaTastic), so Home doesn't carry one too.
+  homePlayerPicker: false,
   // BoxHockey's red (player 1) and blue (player 2), the sticks in Jay's icon art.
   seatColors: { 1: '#f44336', 2: '#2196f3' },
   // No appearance or fontFamily: the theme follows the system's appearance, and Paper keeps its own font.

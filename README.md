@@ -19,7 +19,7 @@ PuckTastic is a pack of physics-driven puck games for iOS, Android, and web, and
 
 ## Features
 
-- **One app, one Home:** pick who's playing (seat 1), then a game from the list. Each game shows its How to Play cards the first time it's opened, and its rules button replays them.
+- **One app, one Home:** pick a game from the list, and its loadout opens on who's playing (seat 1). Each game shows its How to Play cards the first time it's opened, and its rules button replays them.
 - **Seat 2, kept across games:** each loadout's seat 2 button picks the CPU (Easy, Medium, or Hard, set per game), Player 2, a saved profile, or Nobody (Breaker only). It's saved for the whole pack, so the same two people stay set up from one game to the next. In 2 Player on a phone, the loadout and the match seat the two players face to face.
 - **Player profiles:** saved names, colors, and tags. On iOS the roster is shared with my other games through an App Group. A profile's color pick for a seat is kept for this pack only.
 - **Stats and achievements:** each game keeps its own stats and its own achievements (138 in all: Box Hockey 33, Air Hockey 33, Paddles 33, Breaker 39). One stats screen filters by player and by game, with per-profile and device-wide records, player rankings, and day streaks. Unlocks show as toasts; in 2 Player each player's toasts and Game Over card face them in their own half.
