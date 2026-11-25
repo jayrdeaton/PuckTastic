@@ -51,7 +51,7 @@ App Review flagged LightCycles, Snake and Solitaire as spam (too many similar ap
 ```bash
 npm run lint          # expo lint .
 npm run fix            # expo lint . --fix
-npm test               # Jest (61 suites, 797 tests)
+npm test               # Jest (62 suites, 802 tests)
 npm run test:watch     # Jest --watchAll
 npm run typecheck      # tsc
 npm run verify         # lint + test + typecheck
@@ -574,3 +574,15 @@ Jay asked for every place a pack's font should show to be fixed in one pass, ups
 - **Left alone on purpose:** hud's menus, color picker tag and READY? default to the monospace by design; body text, rows and the Edit Profile hints follow the theme; feedback-press's own `Text` is only its fallback with no Paper; toast titles are notification text, not titles.
 - **Checked:** each package's `npm run verify` before its release (hud 553 tests, profile 378, toaster 81, shell 268), and here `npm run verify` (61 suites, 797 tests). On the web dev server at 390x844: with packed builds before the release, seat 1's Manage opening `/profiles?seat=1`, New Profile at `/profile/new?seat=1`, and a profile made there coming back as seat 1 on Home and saved (deleted afterward); on the published versions, Box Hockey's How to Play card title in bold monospace and the Achievements heading in Paper's font. hud's session also checked PuckTastic with its packed build, and the toaster's checked a DuelTastic toast in its monospace. **Not checked:** a device.
 - **Native:** none of the four changed native files, but the profile bump moves the iOS fingerprint again (`6b91f789`; Android stays `80874088`). The next native build was already required (since 2026-11-17), and this rides it.
+
+## Titled dials, and the speed dials split (2026-11-25)
+
+Jay, on Air Hockey's loadout: an open dial's menu said nothing about what it picks ("these need titles"), least of all puck size and paddle size, whose triggers and rows show the same small/medium/large circles; and "the speed dials in breaker and airhockey could be split up, since there is plenty of space for extra dials". Air Hockey's were already one setting a dial (puck speed, puck size and paddle size were split before 2.0); the bundled speed dials were Box Hockey's and the paddle games'.
+
+- **Titles are hud's** (`@tastic/hud` 0.39.0, `SectionedDropdown`'s `title`): every open menu is headed by its trigger's `accessibilityLabel` in small capitals, so no game draws its own. Two labels changed to read as titles: Box Hockey's shot picker (Flick, Stick, Pull, Push) is "Shot style" (was "Controls"), and the paddle games' tilt dial is "Steering" (was "Tilt Control", which repeated its one option). Air Hockey's and the paddle games' desktop key pickers are hud's `ControlSchemePicker`, titled Control scheme.
+- **Box Hockey:** puck speed (speedometer) and puck size (hockey puck) are their own dials, ids `friction` and `puckSize` (they were the "Puck physics" menu, `puckPhysics`). Score to win and tip-off stay one "Match rules" menu: seven dials wrap onto a second line on most phones. Its score options now say "First to 3" to "First to 10" (they were bare numbers under the menu's title; the other games' score menus are titled Score to win and keep them), and its tip-offs are headed TIP-OFF under the divider (a section `title`, hud 0.39.0; Jay asked for a title there). Its row's gap is 14 (Air Hockey's and the paddle games' 20) so the six fit a 375pt phone: the row is 343 wide inside the loadout's 16pt padding, and six 44pt triggers take 334.
+- **Paddles and Breaker:** paddle size and puck speed are their own dials, ids `paddleSize` and `ballSpeed` (they were "Paddle size and puck speed", `paddleBallPhysics`).
+- **Air Hockey:** paddle size keeps its own icon on its trigger (`staticIcon`, hud 0.39.0: `circle-double`, a mallet from above), so it no longer shows the same circle as puck size.
+- **Tests:** `loadoutDials.test.ts` (each game's `optionIds` are the dials its row draws, puck speed and every size a dial of one section, Air Hockey's paddle size on its own icon). hud's own tests cover the title and `staticIcon`.
+- **Native:** none; hud is JavaScript only, and both fingerprints are unchanged by it (iOS `6b91f789`, Android `80874088`).
+- **Checked on the web dev server** with a packed hud (the same code as the published 0.39.0): Air Hockey's dials (paddle size's mallet beside puck size's dot) and its PUCK SIZE menu; Breaker's PADDLE SIZE menu beside its own puck speed dial; Box Hockey's six dials on one line at 375x812 and its MATCH RULES menu with First to N, then TIP-OFF over the tip-offs, Face-Off's description wrapping inside the menu (hud's row fix). **Not checked:** a device, dark mode, 2 Player.

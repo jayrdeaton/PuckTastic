@@ -34,7 +34,7 @@ interface Props {
 }
 
 // The popover ids this row opens, so the loadout can elevate it while one is open.
-export const LOADOUT_SHARED_CONTROLS_IDS = ['paddleBallPhysics', 'scoreToWin', 'tiltControl']
+export const LOADOUT_SHARED_CONTROLS_IDS = ['paddleSize', 'ballSpeed', 'scoreToWin', 'tiltControl']
 
 // The paddle games' always-upright row of match settings: paddle size and puck speed in one menu,
 // score to win, and tilt steering where it applies. Paddles and Breaker share it; neither has a
@@ -58,29 +58,18 @@ export function LoadoutSharedControls({ host: sharedHost, paddleSize, paddleSize
       )}
 
       <View style={styles.row}>
-        {/* Paddle size and puck speed both govern how the paddles and puck behave, so they share
-        one popover as two sections. autoDismiss is off so picking one doesn't close the popover
-        before the other has been looked at; press-away or the trigger closes it. */}
-        <SectionedDropdown
-          id='paddleBallPhysics'
-          host={host}
-          icon='speedometer-medium'
-          accessibilityLabel='Paddle size and puck speed'
-          autoDismiss={false}
-          sections={[
-            { kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange },
-            { kind: 'single', id: 'ballSpeed', options: ballSpeedOptions, value: ballSpeed, onChange: onBallSpeedChange }
-          ]}
-          accentColor={accentColor}
-          mutedColor={mutedColor}
-          onAccentColor={onAccentColor}
-          dark={dark}
-        />
+        {/* Paddle size and puck speed each have their own trigger, each menu titled with its name
+      (hud's SectionedDropdown title, its accessibilityLabel): Jay, 2026-11-25, "the speed dials in
+      breaker ... could be split up, since there is plenty of space for extra dials". They were one
+      "Paddle size and puck speed" menu behind the speedometer. */}
+        <SectionedDropdown id='paddleSize' host={host} icon='arrow-expand-vertical' accessibilityLabel='Paddle size' sections={[{ kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+
+        <SectionedDropdown id='ballSpeed' host={host} icon='speedometer-medium' accessibilityLabel='Puck speed' sections={[{ kind: 'single', id: 'ballSpeed', options: ballSpeedOptions, value: ballSpeed, onChange: onBallSpeedChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
         <SectionedDropdown id='scoreToWin' host={host} icon='flag-checkered' accessibilityLabel='Score to win' sections={[{ kind: 'single', id: 'scoreToWin', options: scoreToWinOptions, value: scoreToWin, onChange: onScoreToWinChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
         {/* A single boolean as a one-option 'multi' section: presence in the value array is "on". */}
-        {showTiltControl && <SectionedDropdown id='tiltControl' host={host} icon='screen-rotation' accessibilityLabel='Tilt Control' sections={[{ kind: 'multi', id: 'tiltControl', options: [tiltControlOption!], value: tiltControlEnabled ? [tiltControlOption!.value] : [], onChange: (value) => onTiltControlEnabledChange!(value.includes(tiltControlOption!.value)) }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />}
+        {showTiltControl && <SectionedDropdown id='tiltControl' host={host} icon='screen-rotation' accessibilityLabel='Steering' sections={[{ kind: 'multi', id: 'tiltControl', options: [tiltControlOption!], value: tiltControlEnabled ? [tiltControlOption!.value] : [], onChange: (value) => onTiltControlEnabledChange!(value.includes(tiltControlOption!.value)) }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />}
       </View>
     </View>
   )

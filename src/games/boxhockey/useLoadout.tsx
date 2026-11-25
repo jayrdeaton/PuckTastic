@@ -40,7 +40,9 @@ const PUCK_SIZE_OPTIONS: MenuOption<PuckSizeLevel>[] = [
   { value: 'large', label: 'Large', description: 'Wider goal & gaps', icon: 'circle-outline' }
 ]
 
-const SCORE_TO_WIN_OPTIONS: MenuOption<number>[] = [3, 5, 7, 10].map((value) => ({ value, label: String(value) }))
+// "First to 5", not a bare 5: they share the Match rules menu with the tip-off, so its title doesn't say what the numbers are (the
+// other games' score menus are titled Score to win, and keep the bare numbers). How to Play's card says the same: First to N Goals Wins.
+const SCORE_TO_WIN_OPTIONS: MenuOption<number>[] = [3, 5, 7, 10].map((value) => ({ value, label: `First to ${value}` }))
 
 const SHOT_PREVIEW_LENGTH_OPTIONS: MenuOption<ShotPreviewLength>[] = [
   { value: 'off', label: 'Off', description: 'No trajectory preview', icon: 'eye-off-outline' },
@@ -161,7 +163,7 @@ export function useLoadout(mode: RoundMode): GameLoadout {
 
   // A person's shot-style picker (Flick, Stick, Pull, Push) under their seat button. A CPU never
   // gets one: useAIOpponent.ts cancels the scheme's sign back out, so it's invisible to the CPU.
-  const seatControl = useCallback((seat: Seat, host: PopoverHost, { accentColor, mutedColor, dark }: SeatControlLook) => <SectionedDropdown id={`p${seat}-control`} host={host} icon='arrow-collapse' accessibilityLabel='Controls' sections={[{ kind: 'single', id: 'controlScheme', options: CONTROL_SCHEME_OPTIONS, value: settings.controlScheme[seat], onChange: (value: ControlScheme) => setSeatControl(seat, value) }]} accentColor={accentColor} mutedColor={mutedColor} dark={dark} />, [settings.controlScheme, setSeatControl])
+  const seatControl = useCallback((seat: Seat, host: PopoverHost, { accentColor, mutedColor, dark }: SeatControlLook) => <SectionedDropdown id={`p${seat}-control`} host={host} icon='arrow-collapse' accessibilityLabel='Shot style' sections={[{ kind: 'single', id: 'controlScheme', options: CONTROL_SCHEME_OPTIONS, value: settings.controlScheme[seat], onChange: (value: ControlScheme) => setSeatControl(seat, value) }]} accentColor={accentColor} mutedColor={mutedColor} dark={dark} />, [settings.controlScheme, setSeatControl])
 
   const cpuDifficulty = useMemo(() => ({ value: settings.aiDifficulty, options: AI_DIFFICULTY_OPTIONS, onChange: (value: string) => setSettings({ aiDifficulty: value as AIDifficulty }) }), [settings.aiDifficulty, setSettings])
 

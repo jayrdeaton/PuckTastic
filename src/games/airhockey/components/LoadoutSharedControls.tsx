@@ -91,12 +91,15 @@ export function LoadoutSharedControls({ host: sharedHost, rink, rinkOption, onRi
       bundled into one 'puckPhysics' popover (three sections behind a single speedometer icon), but
       that buried puck size/paddle size behind a menu literally labeled for speed, and made every
       one of the three an extra tap deep. Each is a real, independent match setting on par with
-      scoreToWin below, so each gets the same standalone-trigger treatment scoreToWin already had. */}
+      scoreToWin below, so each gets the same standalone-trigger treatment scoreToWin already had.
+      Paddle size keeps its own icon (a mallet seen from above) on its trigger (staticIcon, hud 0.39):
+      its options share puck size's small/medium/large circles, so the two triggers looked the same
+      (Jay, 2026-11-25). Each open menu is titled with its name (SectionedDropdown's title). */}
         <SectionedDropdown id='friction' host={host} icon='speedometer-medium' accessibilityLabel='Puck speed' sections={[{ kind: 'single', id: 'friction', options: frictionOptions, value: friction, onChange: onFrictionChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
         <SectionedDropdown id='puckSize' host={host} icon='hockey-puck' accessibilityLabel='Puck size' sections={[{ kind: 'single', id: 'puckSize', options: puckSizeOptions, value: puckSize, onChange: onPuckSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
-        <SectionedDropdown id='paddleSize' host={host} icon='circle-double' accessibilityLabel='Paddle size' sections={[{ kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+        <SectionedDropdown id='paddleSize' host={host} icon='circle-double' staticIcon accessibilityLabel='Paddle size' sections={[{ kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
         <SectionedDropdown id='scoreToWin' host={host} icon='flag-checkered' accessibilityLabel='Score to win' sections={[{ kind: 'single', id: 'scoreToWin', options: scoreToWinOptions, value: scoreToWin, onChange: onScoreToWinChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
       </View>

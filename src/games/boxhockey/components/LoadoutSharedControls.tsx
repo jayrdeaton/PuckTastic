@@ -62,7 +62,7 @@ interface Props {
 // same way P1's own panel does. Exported so loadout.tsx's own SharedActionBand wrapper can run this
 // same "is one of my own popovers open" membership check on itself - see @tastic/hud's
 // SharedActionBand for why it needs to.
-export const LOADOUT_SHARED_CONTROLS_IDS = ['boardVariant', 'puckPhysics', 'slapShot', 'matchRules', 'shotPreviewLength']
+export const LOADOUT_SHARED_CONTROLS_IDS = ['boardVariant', 'friction', 'puckSize', 'slapShot', 'matchRules', 'shotPreviewLength']
 
 export function LoadoutSharedControls({ host: sharedHost, boardVariant, boardVariantOptions, onBoardVariantChange, rink, rinkOption, onRinkChange, friction, frictionOptions, onFrictionChange, puckSize, puckSizeOptions, onPuckSizeChange, interceptSpeed, interceptSpeedOptions, onInterceptSpeedChange, scoreToWin, scoreToWinOptions, onScoreToWinChange, shotPreviewLength, shotPreviewLengthOptions, onShotPreviewLengthChange, tipoffMode, tipoffModeOptions, onTipoffModeChange, onRandomize, onReset, accentColor, mutedColor, onAccentColor, dark }: Props) {
   const ownHost = usePopoverHost()
@@ -105,36 +105,21 @@ export function LoadoutSharedControls({ host: sharedHost, boardVariant, boardVar
           dark={dark}
         />
 
-        {/* Friction and puck size both just govern how the puck itself physically behaves, so they
-      share one popover as two 'single' sections rather than separate triggers - same mechanism as
-      board+rink above, just two full single-select lists instead of a single-select plus a
-      one-item toggle. autoDismiss is off here (unlike board+rink): with two real lists to browse,
-      picking a value in one shouldn't snap the whole popover shut before the other's even been
-      looked at - press-away or the trigger itself closes it once both are set. */}
-        <SectionedDropdown
-          id='puckPhysics'
-          host={host}
-          icon='speedometer-medium'
-          accessibilityLabel='Puck physics'
-          autoDismiss={false}
-          sections={[
-            { kind: 'single', id: 'friction', options: frictionOptions, value: friction, onChange: onFrictionChange },
-            { kind: 'single', id: 'puckSize', options: puckSizeOptions, value: puckSize, onChange: onPuckSizeChange }
-          ]}
-          accentColor={accentColor}
-          mutedColor={mutedColor}
-          onAccentColor={onAccentColor}
-          dark={dark}
-        />
+        {/* Puck speed and puck size each have their own trigger, each menu titled with its name (hud's
+      SectionedDropdown title, its accessibilityLabel): Jay, 2026-11-25, "there is plenty of space for
+      extra dials". They were one "Puck physics" menu behind the speedometer, as Air Hockey's were
+      before theirs were split. */}
+        <SectionedDropdown id='friction' host={host} icon='speedometer-medium' accessibilityLabel='Puck speed' sections={[{ kind: 'single', id: 'friction', options: frictionOptions, value: friction, onChange: onFrictionChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
-        {/* Its own standalone trigger, not folded into puckPhysics above - this isn't a physics
-      tuning knob like friction/puck size, it's a distinct skill mechanic (mid-slide interception,
-      see InterceptSpeed in types/index.ts), and deserves a name that says so rather than being a
-      third unlabeled item buried in a "Puck physics" popover. */}
+        <SectionedDropdown id='puckSize' host={host} icon='hockey-puck' accessibilityLabel='Puck size' sections={[{ kind: 'single', id: 'puckSize', options: puckSizeOptions, value: puckSize, onChange: onPuckSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+
+        {/* A distinct skill mechanic (mid-slide interception, see InterceptSpeed in types/index.ts),
+      not a physics knob like puck speed and size, so it's named for what it does. */}
         <SectionedDropdown id='slapShot' host={host} icon='hockey-sticks' accessibilityLabel='Slap shot' sections={[{ kind: 'single', id: 'interceptSpeed', options: interceptSpeedOptions, value: interceptSpeed, onChange: onInterceptSpeedChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
-        {/* Score to win and tip-off mode are both "how the match plays out" rules - combined for the
-      same reason as puckPhysics above (and same autoDismiss={false}, for the same reason). */}
+        {/* Score to win and tip-off are both "how the match plays out" rules, one menu titled Match
+      rules, with the tip-offs headed Tip-off under the divider (a section title, hud 0.39). autoDismiss is off so picking one doesn't close it before the other's been looked at;
+      press-away or the trigger closes it. */}
         <SectionedDropdown
           id='matchRules'
           host={host}
@@ -143,7 +128,7 @@ export function LoadoutSharedControls({ host: sharedHost, boardVariant, boardVar
           autoDismiss={false}
           sections={[
             { kind: 'single', id: 'scoreToWin', options: scoreToWinOptions, value: scoreToWin, onChange: onScoreToWinChange },
-            { kind: 'single', id: 'tipoffMode', options: tipoffModeOptions, value: tipoffMode, onChange: onTipoffModeChange }
+            { kind: 'single', id: 'tipoffMode', title: 'Tip-off', options: tipoffModeOptions, value: tipoffMode, onChange: onTipoffModeChange }
           ]}
           accentColor={accentColor}
           mutedColor={mutedColor}
@@ -180,16 +165,16 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    // Safety net, not the primary fix - combining related pickers (see puckPhysics/matchRules
-    // above) is what actually keeps this row from feeling cramped. But nothing capped its width
-    // before this, and a row of fixed-size triggers with no wrap just runs off the screen edge on
-    // a narrow device, taking the last trigger or two with it - untappable, not just clipped. Wrap
-    // is what turns that into "drops to a second centered line" instead.
+    // Six fixed-size triggers can be wider than a narrow phone, and a row with no wrap runs off the
+    // screen edge, taking the last trigger or two with it (untappable, not just clipped). Wrap turns
+    // that into a second centered line instead.
     flexWrap: 'wrap',
-    // Matches LightCycles' LobbySharedControls - wider than a plain icon row would need, to give
-    // each trigger's TriggerGauge arc (pulled in close around the icon itself - see TriggerGauge's
-    // own ARC_GAP) room to breathe against its neighbors instead of the arcs crowding each other.
-    gap: 20,
+    // Wider than a plain icon row would need, to give each trigger's TriggerGauge arc (pulled in
+    // close around the icon itself - see TriggerGauge's own ARC_GAP) room to breathe against its
+    // neighbors. 14, not the 20 Air Hockey's five and the paddle games' rows use, so Box Hockey's six
+    // (2026-11-25, puck speed and size split) stay on one line on a 375pt phone (an iPhone SE): its
+    // row is 343 wide inside the loadout's 16pt padding, and six 44pt triggers take 334 at 14 (344 at 16).
+    gap: 14,
     justifyContent: 'center'
   }
 })
