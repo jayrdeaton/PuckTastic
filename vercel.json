@@ -6,6 +6,13 @@
   "outputDirectory": "web-build",
   "framework": null,
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/pucktastic",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/:game/:path*",
