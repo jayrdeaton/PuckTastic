@@ -1,6 +1,6 @@
 {
   "name": "box-hockey",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Four tabletop puck games in one app: Box Hockey, Air Hockey, Paddles and Breaker, against the CPU or a friend across the table.",
   "type": "commonjs",
