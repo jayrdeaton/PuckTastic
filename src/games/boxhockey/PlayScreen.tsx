@@ -4,7 +4,7 @@ import { Button, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { useBackgroundPause, useSettledWindowDimensions } from '@tastic/core'
-import { ConfirmDialog, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
+import { ConfirmDialog, MONO_FONT, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { liveplayActions, MatchChips, safeBack, SettingsDialog, useActiveRound, useAtComputer, useBackBlock, useProfiles } from '@tastic/shell'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
@@ -31,8 +31,6 @@ import { SeatResultCards } from '@/shared/SeatResultCards'
 import { SeatToasters } from '@/shared/SeatToasters'
 import { useGameSound } from '@/shared/useGameSound'
 import { SEAT_TOAST_STACKS, useUnlockToasts } from '@/shared/useUnlockToasts'
-
-const MONO_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
 
 // Web has no second pointer for a two-person race, so A/D and ←/→ stand in for P1/P2's
 // left/right zone - the classic "two players share one keyboard" split (left-hand keys vs. the

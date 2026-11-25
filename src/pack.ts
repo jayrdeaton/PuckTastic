@@ -6,6 +6,7 @@ import { airHockey } from '@/games/airhockey'
 import { boxHockey } from '@/games/boxhockey'
 import { breaker } from '@/games/breaker'
 import { paddles } from '@/games/paddles'
+import { titleType } from '@/hero/fonts'
 import { HeroTitle } from '@/hero/HeroTitle'
 import { createBoxHockey1Import } from '@/importBoxHockey1'
 
@@ -24,6 +25,8 @@ export const pack: PackDefinition = {
   // No appearance or fontFamily: the theme follows the system's appearance, and Paper keeps its own font.
   // The wordmark stacked over a goal line in the players' colors, with a puck bouncing on it.
   HeroTitle,
+  // Every title in the wordmark's monospace (hero/fonts.ts' titleType); small labels stay in Paper's font.
+  titleStyle: titleType,
   otaVersion: release.otaVersion
 }
 
